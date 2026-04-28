@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>dotnet-Deadpool.Agent-f3d5f49b-f2e8-4e6f-acd9-373bbd127886</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Deadpool.Core\Deadpool.Core.csproj" />
+    <ProjectReference Include="..\Deadpool.Infrastructure\Deadpool.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>
