@@ -91,6 +91,7 @@ Core has no dependencies on outer layers.
 **Completed:**
 - ✅ P0-001: Implement Backup Policy Model (Simplified & Immutable)
 - ✅ P0-002: Implement Full Backup Execution
+- ✅ P0-003: Implement Differential Backup Execution
 
 **Next:**
-- P0-003: Implement Differential Backup Execution
+- P0-004: Implement Transaction Log Backup Execution

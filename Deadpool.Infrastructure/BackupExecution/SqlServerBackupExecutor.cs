@@ -39,6 +39,28 @@ public class SqlServerBackupExecutor : IBackupExecutor
             commandTimeout: commandTimeout);
     }
 
+    public async Task ExecuteDifferentialBackupAsync(string databaseName, string backupFilePath)
+    {
+        if (string.IsNullOrWhiteSpace(databaseName))
+            throw new ArgumentException("Database name cannot be empty.", nameof(databaseName));
+
+        if (string.IsNullOrWhiteSpace(backupFilePath))
+            throw new ArgumentException("Backup file path cannot be empty.", nameof(backupFilePath));
+
+        ValidateDatabaseName(databaseName);
+
+        var backupCommand = GenerateDifferentialBackupCommand(databaseName);
+
+        await using var connection = new SqlConnection(_connectionString);
+        await connection.OpenAsync();
+
+        var commandTimeout = 3600; // 1 hour timeout for large backups
+        await connection.ExecuteAsync(
+            backupCommand,
+            new { BackupFilePath = backupFilePath },
+            commandTimeout: commandTimeout);
+    }
+
     public async Task<bool> VerifyBackupFileAsync(string backupFilePath)
     {
         if (string.IsNullOrWhiteSpace(backupFilePath))
@@ -78,6 +100,34 @@ public class SqlServerBackupExecutor : IBackupExecutor
             BACKUP DATABASE [{databaseName}]
             TO DISK = @BackupFilePath
             WITH 
+                INIT,
+                COMPRESSION,
+                CHECKSUM,
+                STATS = 10";
+    }
+
+    private string GenerateDifferentialBackupCommand(string databaseName)
+    {
+        // NOTE: Differential backup captures changes since last FULL backup.
+        // 
+        // DIFFERENTIAL keyword:
+        // - Backs up only data that has changed since the last full backup
+        // - Depends on valid full backup base
+        // - Does not break transaction log chain
+        //
+        // INIT option:
+        // - Overwrites existing differential backup file
+        // - Appropriate for scheduled differential backups
+        //
+        // Required SQL Server permissions:
+        // - BACKUP DATABASE permission on the target database
+        // - Or membership in db_backupoperator, db_owner, or sysadmin roles
+        // - Write permission on backup file location
+        return $@"
+            BACKUP DATABASE [{databaseName}]
+            TO DISK = @BackupFilePath
+            WITH 
+                DIFFERENTIAL,
                 INIT,
                 COMPRESSION,
                 CHECKSUM,

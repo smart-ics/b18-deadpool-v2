@@ -52,6 +52,45 @@ public class BackupService
         return backupJob;
     }
 
+    public async Task<BackupJob> ExecuteDifferentialBackupAsync(string databaseName)
+    {
+        if (string.IsNullOrWhiteSpace(databaseName))
+            throw new ArgumentException("Database name cannot be empty.", nameof(databaseName));
+
+        // Domain invariant: Differential backup requires valid Full backup foundation
+        var hasFullBackup = await _backupJobRepository.HasSuccessfulFullBackupAsync(databaseName);
+        if (!hasFullBackup)
+            throw new InvalidOperationException(
+                $"Cannot execute differential backup for database '{databaseName}'. " +
+                "No successful full backup found. A full backup is required as the differential base.");
+
+        var backupFilePath = _filePathService.GenerateBackupFilePath(databaseName, BackupType.Differential);
+        var backupJob = new BackupJob(databaseName, BackupType.Differential, backupFilePath);
+
+        // Persist job BEFORE execution to track even if process crashes
+        await _backupJobRepository.CreateAsync(backupJob);
+
+        try
+        {
+            backupJob.MarkAsRunning();
+            await _backupJobRepository.UpdateAsync(backupJob);
+
+            await _backupExecutor.ExecuteDifferentialBackupAsync(databaseName, backupFilePath);
+
+            var fileSize = GetBackupFileSize(backupFilePath);
+            backupJob.MarkAsCompleted(fileSize);
+            await _backupJobRepository.UpdateAsync(backupJob);
+        }
+        catch (Exception ex)
+        {
+            backupJob.MarkAsFailed(ex.Message);
+            await _backupJobRepository.UpdateAsync(backupJob);
+            throw;
+        }
+
+        return backupJob;
+    }
+
     public async Task<bool> VerifyBackupAsync(string backupFilePath)
     {
         if (string.IsNullOrWhiteSpace(backupFilePath))
