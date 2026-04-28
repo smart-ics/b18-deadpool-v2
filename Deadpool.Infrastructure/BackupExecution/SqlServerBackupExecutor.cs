@@ -19,46 +19,17 @@ public class SqlServerBackupExecutor : IBackupExecutor
 
     public async Task ExecuteFullBackupAsync(string databaseName, string backupFilePath)
     {
-        if (string.IsNullOrWhiteSpace(databaseName))
-            throw new ArgumentException("Database name cannot be empty.", nameof(databaseName));
-
-        if (string.IsNullOrWhiteSpace(backupFilePath))
-            throw new ArgumentException("Backup file path cannot be empty.", nameof(backupFilePath));
-
-        ValidateDatabaseName(databaseName);
-
-        var backupCommand = GenerateFullBackupCommand(databaseName);
-
-        await using var connection = new SqlConnection(_connectionString);
-        await connection.OpenAsync();
-
-        var commandTimeout = 3600; // 1 hour timeout for large backups
-        await connection.ExecuteAsync(
-            backupCommand,
-            new { BackupFilePath = backupFilePath },
-            commandTimeout: commandTimeout);
+        await ExecuteBackupCommandAsync(databaseName, backupFilePath, GenerateFullBackupCommand);
     }
 
     public async Task ExecuteDifferentialBackupAsync(string databaseName, string backupFilePath)
     {
-        if (string.IsNullOrWhiteSpace(databaseName))
-            throw new ArgumentException("Database name cannot be empty.", nameof(databaseName));
+        await ExecuteBackupCommandAsync(databaseName, backupFilePath, GenerateDifferentialBackupCommand);
+    }
 
-        if (string.IsNullOrWhiteSpace(backupFilePath))
-            throw new ArgumentException("Backup file path cannot be empty.", nameof(backupFilePath));
-
-        ValidateDatabaseName(databaseName);
-
-        var backupCommand = GenerateDifferentialBackupCommand(databaseName);
-
-        await using var connection = new SqlConnection(_connectionString);
-        await connection.OpenAsync();
-
-        var commandTimeout = 3600; // 1 hour timeout for large backups
-        await connection.ExecuteAsync(
-            backupCommand,
-            new { BackupFilePath = backupFilePath },
-            commandTimeout: commandTimeout);
+    public async Task ExecuteTransactionLogBackupAsync(string databaseName, string backupFilePath)
+    {
+        await ExecuteBackupCommandAsync(databaseName, backupFilePath, GenerateTransactionLogBackupCommand);
     }
 
     public async Task<bool> VerifyBackupFileAsync(string backupFilePath)
@@ -80,6 +51,32 @@ public class SqlServerBackupExecutor : IBackupExecutor
             commandTimeout: 300);
 
         return true;
+    }
+
+    // Template method: Common backup command execution pattern
+    private async Task ExecuteBackupCommandAsync(
+        string databaseName,
+        string backupFilePath,
+        Func<string, string> commandGenerator)
+    {
+        if (string.IsNullOrWhiteSpace(databaseName))
+            throw new ArgumentException("Database name cannot be empty.", nameof(databaseName));
+
+        if (string.IsNullOrWhiteSpace(backupFilePath))
+            throw new ArgumentException("Backup file path cannot be empty.", nameof(backupFilePath));
+
+        ValidateDatabaseName(databaseName);
+
+        var backupCommand = commandGenerator(databaseName);
+
+        await using var connection = new SqlConnection(_connectionString);
+        await connection.OpenAsync();
+
+        var commandTimeout = 3600; // 1 hour timeout for large backups
+        await connection.ExecuteAsync(
+            backupCommand,
+            new { BackupFilePath = backupFilePath },
+            commandTimeout: commandTimeout);
     }
 
     private string GenerateFullBackupCommand(string databaseName)
@@ -128,6 +125,39 @@ public class SqlServerBackupExecutor : IBackupExecutor
             TO DISK = @BackupFilePath
             WITH 
                 DIFFERENTIAL,
+                INIT,
+                COMPRESSION,
+                CHECKSUM,
+                STATS = 10";
+    }
+
+    private string GenerateTransactionLogBackupCommand(string databaseName)
+    {
+        // NOTE: Transaction log backup requires FULL or BULK_LOGGED recovery model.
+        // 
+        // BACKUP LOG command:
+        // - Backs up transaction log since last log backup (or last full backup)
+        // - Truncates inactive portion of transaction log after backup
+        // - Maintains log chain continuity (critical for point-in-time recovery)
+        // - Must not break log chain
+        //
+        // INIT option:
+        // - Overwrites existing log backup file
+        // - Appropriate for scheduled log backups (each log backup is independent file)
+        //
+        // Recovery model requirements:
+        // - FULL: Supports full point-in-time recovery
+        // - BULK_LOGGED: Supports bulk operations with minimal logging
+        // - SIMPLE: Transaction log backups NOT supported (log auto-truncates)
+        //
+        // Required SQL Server permissions:
+        // - BACKUP LOG permission on the target database
+        // - Or membership in db_backupoperator, db_owner, or sysadmin roles
+        // - Write permission on backup file location
+        return $@"
+            BACKUP LOG [{databaseName}]
+            TO DISK = @BackupFilePath
+            WITH 
                 INIT,
                 COMPRESSION,
                 CHECKSUM,

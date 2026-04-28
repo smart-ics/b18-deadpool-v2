@@ -11,6 +11,7 @@ public class BackupServiceTests
 {
     private readonly Mock<IBackupExecutor> _mockBackupExecutor;
     private readonly Mock<IBackupJobRepository> _mockBackupJobRepository;
+    private readonly Mock<IDatabaseMetadataService> _mockMetadataService;
     private readonly BackupFilePathService _filePathService;
     private readonly BackupService _backupService;
 
@@ -18,12 +19,14 @@ public class BackupServiceTests
     {
         _mockBackupExecutor = new Mock<IBackupExecutor>();
         _mockBackupJobRepository = new Mock<IBackupJobRepository>();
+        _mockMetadataService = new Mock<IDatabaseMetadataService>();
         _filePathService = new BackupFilePathService(@"C:\Backups");
 
         _backupService = new BackupService(
             _mockBackupExecutor.Object,
             _mockBackupJobRepository.Object,
-            _filePathService);
+            _filePathService,
+            _mockMetadataService.Object);
     }
 
     [Fact]
@@ -32,7 +35,8 @@ public class BackupServiceTests
         var act = () => new BackupService(
             null!,
             _mockBackupJobRepository.Object,
-            _filePathService);
+            _filePathService,
+            _mockMetadataService.Object);
 
         act.Should().Throw<ArgumentNullException>()
             .WithParameterName("backupExecutor");
@@ -44,7 +48,8 @@ public class BackupServiceTests
         var act = () => new BackupService(
             _mockBackupExecutor.Object,
             null!,
-            _filePathService);
+            _filePathService,
+            _mockMetadataService.Object);
 
         act.Should().Throw<ArgumentNullException>()
             .WithParameterName("backupJobRepository");
@@ -56,10 +61,24 @@ public class BackupServiceTests
         var act = () => new BackupService(
             _mockBackupExecutor.Object,
             _mockBackupJobRepository.Object,
-            null!);
+            null!,
+            _mockMetadataService.Object);
 
         act.Should().Throw<ArgumentNullException>()
             .WithParameterName("filePathService");
+    }
+
+    [Fact]
+    public void Constructor_ShouldThrowArgumentNullException_WhenMetadataServiceIsNull()
+    {
+        var act = () => new BackupService(
+            _mockBackupExecutor.Object,
+            _mockBackupJobRepository.Object,
+            _filePathService,
+            null!);
+
+        act.Should().Throw<ArgumentNullException>()
+            .WithParameterName("databaseMetadataService");
     }
 
     [Fact]

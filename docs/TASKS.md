@@ -22,7 +22,7 @@ Produce reliable automated SQL Server backups.
 
 ### P0-001 Implement Backup Policy Model
 
-Status: Todo
+Status: Done
 
 Build domain model for:
 
@@ -45,7 +45,7 @@ Assigned agents:
 
 ### P0-002 Implement Full Backup Execution
 
-Status: Todo
+Status: Done
 
 Implement Full backup execution via native T-SQL.
 
@@ -71,7 +71,7 @@ Agents:
 
 ### P0-003 Implement Differential Backup
 
-Status: Todo
+Status: Done
 
 Implement differential backup execution.
 
@@ -83,7 +83,7 @@ Depends on:
 
 ### P0-004 Implement Transaction Log Backup
 
-Status: Todo
+Status: Done
 
 Implement transaction log backup execution.
 
@@ -92,6 +92,32 @@ Depends on:
 - P0-003
 
 Requires DBA review.
+
+---
+
+### P0-R1 Refactor Common Backup Execution Pattern
+Status: Done
+
+Goal:
+Eliminate duplication across:
+
+- Full backup execution
+- Differential backup execution
+- Transaction log backup execution
+
+Reason:
+Created from Architect review after P0-004.
+
+Done when:
+- Common backup lifecycle extracted
+- Duplication materially reduced
+- No behavior changes
+- All tests pass
+
+Agents:
+- Coding
+- Architect
+- DBA (review)
 
 ---
 
