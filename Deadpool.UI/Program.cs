@@ -41,6 +41,9 @@ static class Program
             dashboardOptions.BackupVolumePath,
             dashboardOptions.AutoRefreshIntervalSeconds);
 
+        // Store service provider for child forms
+        dashboard.Tag = serviceProvider;
+
         Application.Run(dashboard);
     }
 
@@ -70,6 +73,7 @@ static class Program
         // Core services
         services.AddSingleton<IDashboardMonitoringService, DashboardMonitoringService>();
         services.AddSingleton<IStorageMonitoringService, StorageMonitoringService>();
+        services.AddSingleton<IBackupJobMonitoringService, BackupJobMonitoringService>();
 
         // Other repositories (still in-memory for now)
         services.AddSingleton<IStorageHealthCheckRepository, InMemoryStorageHealthCheckRepository>();

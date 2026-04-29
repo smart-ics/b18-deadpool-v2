@@ -34,6 +34,7 @@ namespace Deadpool.UI
             this.lblTitle = new System.Windows.Forms.Label();
             this.lblLastRefresh = new System.Windows.Forms.Label();
             this.btnRefresh = new System.Windows.Forms.Button();
+            this.btnJobMonitor = new System.Windows.Forms.Button();
             this.panelLastBackupStatus = new System.Windows.Forms.Panel();
             this.lblLastBackupTitle = new System.Windows.Forms.Label();
             this.lblFullBackup = new System.Windows.Forms.Label();
@@ -63,6 +64,7 @@ namespace Deadpool.UI
             this.panelHeader.Controls.Add(this.lblTitle);
             this.panelHeader.Controls.Add(this.lblLastRefresh);
             this.panelHeader.Controls.Add(this.btnRefresh);
+            this.panelHeader.Controls.Add(this.btnJobMonitor);
             this.panelHeader.Dock = System.Windows.Forms.DockStyle.Top;
             this.panelHeader.Location = new System.Drawing.Point(0, 0);
             this.panelHeader.Name = "panelHeader";
@@ -101,6 +103,17 @@ namespace Deadpool.UI
             this.btnRefresh.Text = "Refresh";
             this.btnRefresh.UseVisualStyleBackColor = true;
             this.btnRefresh.Click += new System.EventHandler(this.btnRefresh_Click);
+            // 
+            // btnJobMonitor
+            // 
+            this.btnJobMonitor.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.btnJobMonitor.Location = new System.Drawing.Point(950, 15);
+            this.btnJobMonitor.Name = "btnJobMonitor";
+            this.btnJobMonitor.Size = new System.Drawing.Size(120, 30);
+            this.btnJobMonitor.TabIndex = 3;
+            this.btnJobMonitor.Text = "Job Monitor";
+            this.btnJobMonitor.UseVisualStyleBackColor = true;
+            this.btnJobMonitor.Click += new System.EventHandler(this.btnJobMonitor_Click);
             // 
             // panelLastBackupStatus
             // 
@@ -308,6 +321,7 @@ namespace Deadpool.UI
         private System.Windows.Forms.Label lblTitle;
         private System.Windows.Forms.Label lblLastRefresh;
         private System.Windows.Forms.Button btnRefresh;
+        private System.Windows.Forms.Button btnJobMonitor;
         private System.Windows.Forms.Panel panelLastBackupStatus;
         private System.Windows.Forms.Label lblLastBackupTitle;
         private System.Windows.Forms.Label lblFullBackup;

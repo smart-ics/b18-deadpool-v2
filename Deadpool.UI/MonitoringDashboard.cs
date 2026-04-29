@@ -50,6 +50,27 @@ public partial class MonitoringDashboard : Form
         await RefreshDashboardAsync();
     }
 
+    private void btnJobMonitor_Click(object sender, EventArgs e)
+    {
+        // Open job monitor form
+        var serviceProvider = (Application.OpenForms[0] as MonitoringDashboard)?.Tag as IServiceProvider;
+        if (serviceProvider == null)
+        {
+            MessageBox.Show("Cannot open job monitor: service provider not available.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            return;
+        }
+
+        var monitoringService = serviceProvider.GetService(typeof(IBackupJobMonitoringService)) as IBackupJobMonitoringService;
+        if (monitoringService == null)
+        {
+            MessageBox.Show("Cannot open job monitor: monitoring service not available.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            return;
+        }
+
+        var jobMonitorForm = new BackupJobMonitorForm(monitoringService, _databaseName);
+        jobMonitorForm.Show();
+    }
+
     private async Task RefreshDashboardAsync()
     {
         try
