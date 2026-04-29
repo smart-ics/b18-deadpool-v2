@@ -11,7 +11,9 @@
 
   <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="6.0.0" />
+    <PackageReference Include="Cronos" Version="0.8.1" />
     <PackageReference Include="FluentAssertions" Version="8.9.0" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.2" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
     <PackageReference Include="Moq" Version="4.20.72" />
     <PackageReference Include="xunit" Version="2.5.3" />
@@ -25,6 +27,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Deadpool.Core\Deadpool.Core.csproj" />
     <ProjectReference Include="..\Deadpool.Infrastructure\Deadpool.Infrastructure.csproj" />
+    <ProjectReference Include="..\Deadpool.Agent\Deadpool.Agent.csproj" />
   </ItemGroup>
 
 </Project>
