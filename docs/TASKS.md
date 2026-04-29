@@ -131,7 +131,7 @@ Automate backup execution.
 
 ### P0-005 Implement Cronos Scheduler
 
-Status: Todo
+Status: Done
 
 Implement:
 
@@ -148,7 +148,7 @@ Done when:
 
 ### P0-006 Implement Worker Pipeline
 
-Status: Todo
+Status: Done
 
 Implement hosted workers:
 
@@ -171,7 +171,7 @@ Copy backups to separate storage server.
 
 ### P1-007 Implement Backup File Copy
 
-Status: Todo
+Status: Done
 
 Implement:
 

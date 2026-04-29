@@ -22,6 +22,8 @@ public sealed class BackupExecutionWorker : BackgroundService
     private readonly IBackupExecutor _backupExecutor;
     private readonly BackupFilePathService _filePathService;
     private readonly IDatabaseMetadataService _databaseMetadataService;
+    private readonly IBackupFileCopyService? _copyService;
+    private readonly bool _copyEnabled;
     private readonly TimeSpan _staleJobThreshold;
 
     public BackupExecutionWorker(
@@ -30,7 +32,9 @@ public sealed class BackupExecutionWorker : BackgroundService
         IBackupExecutor backupExecutor,
         BackupFilePathService filePathService,
         IDatabaseMetadataService databaseMetadataService,
-        IOptions<ExecutionWorkerOptions> options)
+        IOptions<ExecutionWorkerOptions> options,
+        IOptions<BackupCopyOptions> copyOptions,
+        IBackupFileCopyService? copyService = null)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _jobRepository = jobRepository ?? throw new ArgumentNullException(nameof(jobRepository));
@@ -40,6 +44,13 @@ public sealed class BackupExecutionWorker : BackgroundService
 
         var opts = options?.Value ?? throw new ArgumentNullException(nameof(options));
         _staleJobThreshold = opts.StaleJobThreshold;
+
+        var copyOpts = copyOptions?.Value ?? throw new ArgumentNullException(nameof(copyOptions));
+        _copyEnabled = copyOpts.Enabled;
+        _copyService = copyService;
+
+        if (_copyEnabled && _copyService == null)
+            throw new InvalidOperationException("Copy is enabled but IBackupFileCopyService is not registered.");
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -122,6 +133,12 @@ public sealed class BackupExecutionWorker : BackgroundService
             _logger.LogInformation(
                 "Successfully completed {Type} backup for {Database}",
                 job.BackupType, job.DatabaseName);
+
+            // Copy to remote storage (if enabled)
+            if (_copyEnabled && _copyService != null)
+            {
+                await TryCopyBackupFileAsync(job, backupFilePath);
+            }
         }
         catch (Exception ex)
         {
@@ -204,5 +221,52 @@ public sealed class BackupExecutionWorker : BackgroundService
             throw new FileNotFoundException($"Backup file not found: {backupFilePath}");
 
         return new FileInfo(backupFilePath).Length;
+    }
+
+    private async Task TryCopyBackupFileAsync(BackupJob job, string backupFilePath)
+    {
+        try
+        {
+            _logger.LogInformation(
+                "Starting backup file copy for {Database} {Type}",
+                job.DatabaseName, job.BackupType);
+
+            // Determine destination path
+            var destinationPath = await _copyService!.CopyBackupFileAsync(
+                backupFilePath,
+                job.DatabaseName,
+                job.BackupType);
+
+            job.MarkCopyStarted(destinationPath);
+            job.MarkCopyCompleted();
+            await _jobRepository.UpdateAsync(job);
+
+            _logger.LogInformation(
+                "Backup file copied successfully: {Destination} (duration: {Duration})",
+                destinationPath, job.GetCopyDuration());
+        }
+        catch (Exception ex)
+        {
+            // Copy failure does NOT endanger the original backup
+            _logger.LogError(ex,
+                "Failed to copy backup file for {Database} {Type}: {Message}. " +
+                "Local backup remains intact at {Path}",
+                job.DatabaseName, job.BackupType, ex.Message, backupFilePath);
+
+            try
+            {
+                job.MarkCopyStarted(backupFilePath); // Record attempt even if failed
+                job.MarkCopyFailed(ex.Message);
+                await _jobRepository.UpdateAsync(job);
+            }
+            catch (Exception updateEx)
+            {
+                _logger.LogWarning(updateEx,
+                    "Failed to update copy failure status for {Database} {Type}",
+                    job.DatabaseName, job.BackupType);
+            }
+
+            // Do not propagate exception - local backup succeeded
+        }
     }
 }

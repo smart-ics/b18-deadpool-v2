@@ -37,13 +37,20 @@ public class WorkerPipelineTests
             StaleJobThreshold = TimeSpan.FromHours(2)
         };
 
+        var copyOptions = new BackupCopyOptions
+        {
+            RemoteStoragePath = "" // Disabled by default in tests
+        };
+
         var executor = new BackupExecutionWorker(
             NullLogger<BackupExecutionWorker>.Instance,
             repo,
             backupExecutor,
             filePathService,
             metadataService,
-            Options.Create(executorOptions));
+            Options.Create(executorOptions),
+            Options.Create(copyOptions),
+            copyService: null);
 
         return (scheduler, executor, repo);
     }
@@ -131,6 +138,8 @@ public class WorkerPipelineTests
             StaleJobThreshold = TimeSpan.FromHours(2)
         };
 
+        var copyOptions = new BackupCopyOptions { RemoteStoragePath = "" };
+
         // Create two executor workers
         var executor1 = new BackupExecutionWorker(
             NullLogger<BackupExecutionWorker>.Instance,
@@ -138,7 +147,8 @@ public class WorkerPipelineTests
             backupExecutor,
             filePathService,
             metadataService,
-            Options.Create(executorOptions));
+            Options.Create(executorOptions),
+            Options.Create(copyOptions));
 
         var executor2 = new BackupExecutionWorker(
             NullLogger<BackupExecutionWorker>.Instance,
@@ -146,7 +156,8 @@ public class WorkerPipelineTests
             backupExecutor,
             filePathService,
             metadataService,
-            Options.Create(executorOptions));
+            Options.Create(executorOptions),
+            Options.Create(copyOptions));
 
         // Create pending job
         var job = new BackupJob("TestDB", BackupType.Full, "C:\\Backups\\test.bak");
@@ -214,13 +225,16 @@ public class WorkerPipelineTests
             StaleJobThreshold = TimeSpan.FromHours(2)
         };
 
+        var copyOptions = new BackupCopyOptions { RemoteStoragePath = "" };
+
         var executor = new BackupExecutionWorker(
             NullLogger<BackupExecutionWorker>.Instance,
             repo,
             failingExecutor,
             filePathService,
             metadataService,
-            Options.Create(executorOptions));
+            Options.Create(executorOptions),
+            Options.Create(copyOptions));
 
         // Create pending job
         var job = new BackupJob("TestDB", BackupType.Full, "C:\\Backups\\test.bak");
@@ -304,13 +318,16 @@ public class WorkerPipelineTests
 
         await Task.Delay(150); // Ensure job is stale
 
+        var copyOptions = new BackupCopyOptions { RemoteStoragePath = "" };
+
         var executor = new BackupExecutionWorker(
             NullLogger<BackupExecutionWorker>.Instance,
             repo,
             backupExecutor,
             filePathService,
             metadataService,
-            Options.Create(executorOptions));
+            Options.Create(executorOptions),
+            Options.Create(copyOptions));
 
         // Act - Executor should pick up and complete the stale job
         var cts = new CancellationTokenSource();
@@ -345,13 +362,16 @@ public class WorkerPipelineTests
             StaleJobThreshold = TimeSpan.FromHours(2)
         };
 
+        var copyOptions = new BackupCopyOptions { RemoteStoragePath = "" };
+
         var executor = new BackupExecutionWorker(
             NullLogger<BackupExecutionWorker>.Instance,
             repo,
             backupExecutor,
             filePathService,
             metadataService,
-            Options.Create(executorOptions));
+            Options.Create(executorOptions),
+            Options.Create(copyOptions));
 
         // Act - Executor should NOT pick up the recent Running job
         var cts = new CancellationTokenSource();
