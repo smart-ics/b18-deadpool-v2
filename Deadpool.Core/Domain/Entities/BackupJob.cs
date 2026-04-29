@@ -13,6 +13,13 @@ public class BackupJob
     public long? FileSizeBytes { get; private set; }
     public string? ErrorMessage { get; private set; }
 
+    // LSN metadata for restore chain validation
+    // Captured from msdb.dbo.backupset after backup completion
+    public decimal? FirstLSN { get; private set; }
+    public decimal? LastLSN { get; private set; }
+    public decimal? DatabaseBackupLSN { get; private set; } // For Differential: LSN of base Full backup
+    public decimal? CheckpointLSN { get; private set; } // For Full: checkpoint LSN that Differentials reference
+
     public BackupJob(
         string databaseName,
         BackupType backupType,
@@ -50,6 +57,21 @@ public class BackupJob
         Status = BackupStatus.Completed;
         EndTime = DateTime.UtcNow;
         FileSizeBytes = fileSizeBytes;
+    }
+
+    /// <summary>
+    /// Sets LSN metadata for restore chain validation.
+    /// Must be called after backup completion.
+    /// </summary>
+    public void SetLSNMetadata(decimal? firstLSN, decimal? lastLSN, decimal? databaseBackupLSN, decimal? checkpointLSN)
+    {
+        if (Status != BackupStatus.Completed)
+            throw new InvalidOperationException("LSN metadata can only be set for completed backups.");
+
+        FirstLSN = firstLSN;
+        LastLSN = lastLSN;
+        DatabaseBackupLSN = databaseBackupLSN;
+        CheckpointLSN = checkpointLSN;
     }
 
     public void MarkAsFailed(string errorMessage)

@@ -183,6 +183,22 @@ public sealed class InMemoryBackupJobRepository : IBackupJobRepository
         }
     }
 
+    public Task<IEnumerable<BackupJob>> GetBackupsByDatabaseAsync(string databaseName)
+    {
+        if (string.IsNullOrWhiteSpace(databaseName))
+            throw new ArgumentException("Database name cannot be empty.", nameof(databaseName));
+
+        lock (_lock)
+        {
+            var backups = _jobs
+                .Where(j => j.DatabaseName == databaseName)
+                .OrderByDescending(j => j.StartTime)
+                .ToList();
+
+            return Task.FromResult<IEnumerable<BackupJob>>(backups);
+        }
+    }
+
     // Helper for testing - not part of interface
     private int GetJobId(BackupJob job)
     {

@@ -276,5 +276,8 @@ public class WorkerPipelineTests
 
         public Task<bool> VerifyBackupFileAsync(string backupFilePath)
             => Task.FromResult(false);
+
+        public Task<Core.Domain.ValueObjects.BackupLSNMetadata?> GetBackupLSNMetadataAsync(string databaseName, string backupFilePath)
+            => Task.FromResult<Core.Domain.ValueObjects.BackupLSNMetadata?>(null);
     }
 }

@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using Dapper;
+using Deadpool.Core.Domain.ValueObjects;
 using Deadpool.Core.Interfaces;
 using Microsoft.Data.SqlClient;
 
@@ -182,5 +183,63 @@ public class SqlServerBackupExecutor : IBackupExecutor
                 "Must start with letter, underscore, @, or #. " +
                 "Subsequent characters can be letters, digits, @, $, #, or underscore.",
                 nameof(databaseName));
+    }
+
+    public async Task<BackupLSNMetadata?> GetBackupLSNMetadataAsync(string databaseName, string backupFilePath)
+    {
+        if (string.IsNullOrWhiteSpace(databaseName))
+            throw new ArgumentException("Database name cannot be empty.", nameof(databaseName));
+
+        if (string.IsNullOrWhiteSpace(backupFilePath))
+            throw new ArgumentException("Backup file path cannot be empty.", nameof(backupFilePath));
+
+        try
+        {
+            await using var connection = new SqlConnection(_connectionString);
+            await connection.OpenAsync();
+
+            // Query msdb.dbo.backupset for LSN metadata
+            // Match by database name and physical_device_name from backupmediafamily
+            // Order by backup_finish_date to get the most recent backup for this file
+            var sql = @"
+                SELECT TOP 1
+                    bs.first_lsn,
+                    bs.last_lsn,
+                    bs.database_backup_lsn,
+                    bs.checkpoint_lsn
+                FROM msdb.dbo.backupset bs
+                INNER JOIN msdb.dbo.backupmediafamily bmf ON bs.media_set_id = bmf.media_set_id
+                WHERE bs.database_name = @DatabaseName
+                  AND bmf.physical_device_name = @BackupFilePath
+                ORDER BY bs.backup_finish_date DESC";
+
+            var result = await connection.QuerySingleOrDefaultAsync<BackupLSNMetadataDto>(
+                sql,
+                new { DatabaseName = databaseName, BackupFilePath = backupFilePath },
+                commandTimeout: 30);
+
+            if (result == null)
+                return null;
+
+            return new BackupLSNMetadata(
+                result.first_lsn,
+                result.last_lsn,
+                result.database_backup_lsn,
+                result.checkpoint_lsn);
+        }
+        catch
+        {
+            // LSN metadata capture failure is non-fatal
+            // Conservative: Return null to signal uncertainty
+            return null;
+        }
+    }
+
+    private class BackupLSNMetadataDto
+    {
+        public decimal? first_lsn { get; set; }
+        public decimal? last_lsn { get; set; }
+        public decimal? database_backup_lsn { get; set; }
+        public decimal? checkpoint_lsn { get; set; }
     }
 }

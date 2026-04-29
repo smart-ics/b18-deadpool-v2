@@ -87,6 +87,10 @@ public class BackupService
 
             var fileSize = GetBackupFileSize(backupFilePath);
             backupJob.MarkAsCompleted(fileSize);
+
+            // Capture LSN metadata from SQL Server for restore chain validation
+            await CaptureAndSetLSNMetadataAsync(backupJob);
+
             await _backupJobRepository.UpdateAsync(backupJob);
         }
         catch (Exception ex)
@@ -97,6 +101,36 @@ public class BackupService
         }
 
         return backupJob;
+    }
+
+    /// <summary>
+    /// Captures LSN metadata from msdb.dbo.backupset for restore chain validation.
+    /// Failure to capture LSN metadata is logged but does not fail the backup job.
+    /// Conservative: If LSN capture fails, retention cleanup will retain more backups.
+    /// </summary>
+    private async Task CaptureAndSetLSNMetadataAsync(BackupJob backupJob)
+    {
+        try
+        {
+            var lsnMetadata = await _backupExecutor.GetBackupLSNMetadataAsync(
+                backupJob.DatabaseName,
+                backupJob.BackupFilePath);
+
+            if (lsnMetadata != null)
+            {
+                backupJob.SetLSNMetadata(
+                    lsnMetadata.FirstLSN,
+                    lsnMetadata.LastLSN,
+                    lsnMetadata.DatabaseBackupLSN,
+                    lsnMetadata.CheckpointLSN);
+            }
+        }
+        catch
+        {
+            // LSN capture failure is non-fatal
+            // Conservative: Backups without LSN metadata will be retained longer by retention cleanup
+            // This prevents accidental deletion of backups that may be needed for restore chains
+        }
     }
 
     // Domain-specific prerequisite validation for differential backups

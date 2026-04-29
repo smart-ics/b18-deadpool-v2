@@ -1,3 +1,4 @@
+using Deadpool.Core.Domain.ValueObjects;
 using Deadpool.Core.Interfaces;
 
 namespace Deadpool.Infrastructure.BackupExecution;
@@ -30,6 +31,13 @@ public sealed class StubBackupExecutor : IBackupExecutor
     public Task<bool> VerifyBackupFileAsync(string backupFilePath)
     {
         return Task.FromResult(File.Exists(backupFilePath));
+    }
+
+    public Task<BackupLSNMetadata?> GetBackupLSNMetadataAsync(string databaseName, string backupFilePath)
+    {
+        // Stub implementation: Return null LSN metadata
+        // Conservative: Retention cleanup will retain more backups when LSN metadata is missing
+        return Task.FromResult<BackupLSNMetadata?>(null);
     }
 
     private static void ValidateParameters(string databaseName, string backupFilePath)

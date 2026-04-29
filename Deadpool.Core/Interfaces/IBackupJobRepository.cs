@@ -20,4 +20,7 @@ public interface IBackupJobRepository
     Task<BackupJob?> GetLastSuccessfulBackupAsync(string databaseName, BackupType backupType);
     Task<BackupJob?> GetLastFailedBackupAsync(string databaseName);
     Task<IEnumerable<BackupJob>> GetBackupChainAsync(string databaseName, DateTime since);
+
+    // Retention cleanup query
+    Task<IEnumerable<BackupJob>> GetBackupsByDatabaseAsync(string databaseName);
 }
