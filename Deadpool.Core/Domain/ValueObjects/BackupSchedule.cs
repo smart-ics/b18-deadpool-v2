@@ -50,10 +50,25 @@ public record BackupSchedule
     // canonical "what just fired" time.  This is used to advance the tracker so that
     // multiple ticks within the same inter-occurrence window all converge on the same
     // anchor, preventing duplicate job creation.
+    //
+    // Implementation note: For first boot or long downtime (lastCheckUtc far in the past),
+    // we limit the backward scan to a reasonable window (30 days) to avoid excessive
+    // iteration. This is safe because we only need the most recent occurrence, not all
+    // historical occurrences.
     public DateTime? GetMostRecentOccurrence(DateTime lastCheckUtc, DateTime nowUtc)
     {
+        // If lastCheck is more than 30 days before now, start from 30 days ago instead.
+        // This prevents walking through years of history on first boot.
+        var searchStart = lastCheckUtc;
+        var maxLookback = TimeSpan.FromDays(30);
+
+        if (nowUtc - lastCheckUtc > maxLookback)
+        {
+            searchStart = nowUtc - maxLookback;
+        }
+
         DateTime? candidate = null;
-        var cursor = lastCheckUtc;
+        var cursor = searchStart;
 
         while (true)
         {
