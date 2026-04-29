@@ -32,8 +32,17 @@ builder.Services.Configure<HealthMonitoringOptions>(
 builder.Services.Configure<StorageMonitoringOptions>(
     builder.Configuration.GetSection("StorageMonitoring"));
 
-// Core services
-builder.Services.AddSingleton<IBackupJobRepository, InMemoryBackupJobRepository>();
+// SQLite shared repository (used by Agent and UI)
+var sqlitePath = builder.Configuration.GetValue<string>("Deadpool:SqliteDatabasePath") ?? "deadpool.db";
+var fullSqlitePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, sqlitePath);
+
+builder.Services.AddSingleton<IBackupJobRepository>(sp =>
+{
+    var logger = sp.GetRequiredService<ILogger<SqliteBackupJobRepository>>();
+    return new SqliteBackupJobRepository(fullSqlitePath, logger);
+});
+
+// Other repositories (still in-memory for now)
 builder.Services.AddSingleton<IBackupHealthCheckRepository, InMemoryBackupHealthCheckRepository>();
 builder.Services.AddSingleton<IStorageHealthCheckRepository, InMemoryStorageHealthCheckRepository>();
 builder.Services.AddSingleton<IScheduleTracker, InMemoryScheduleTracker>();
@@ -80,21 +89,19 @@ builder.Services.AddSingleton<IStorageMonitoringService>(sp =>
 });
 
 // Backup file copy service (conditional registration based on configuration)
-builder.Services.AddSingleton<IBackupFileCopyService?>(sp =>
+var copyOptions = builder.Configuration.GetSection("BackupCopy").Get<BackupCopyOptions>();
+if (copyOptions?.Enabled == true)
 {
-    var copyOptions = sp.GetRequiredService<IOptions<BackupCopyOptions>>().Value;
-
-    if (!copyOptions.Enabled)
-        return null; // Copy disabled
-
-    var logger = sp.GetRequiredService<ILogger<BackupFileCopyService>>();
-
-    return new BackupFileCopyService(
-        logger,
-        copyOptions.RemoteStoragePath,
-        copyOptions.MaxRetryAttempts,
-        copyOptions.RetryDelay);
-});
+    builder.Services.AddSingleton<IBackupFileCopyService>(sp =>
+    {
+        var logger = sp.GetRequiredService<ILogger<BackupFileCopyService>>();
+        return new BackupFileCopyService(
+            logger,
+            copyOptions.RemoteStoragePath,
+            copyOptions.MaxRetryAttempts,
+            copyOptions.RetryDelay);
+    });
+}
 
 // BackupFilePathService
 builder.Services.AddSingleton<BackupFilePathService>(sp =>

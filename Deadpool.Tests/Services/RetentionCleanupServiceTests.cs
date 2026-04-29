@@ -4,6 +4,7 @@ using Deadpool.Core.Domain.ValueObjects;
 using Deadpool.Core.Interfaces;
 using Deadpool.Core.Services;
 using FluentAssertions;
+using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
 
@@ -13,6 +14,7 @@ public class RetentionCleanupServiceTests
 {
     private readonly Mock<IBackupJobRepository> _repositoryMock;
     private readonly Mock<IBackupFileDeleter> _fileDeleterMock;
+    private readonly Mock<ILogger<RetentionCleanupService>> _loggerMock;
     private readonly RetentionCleanupService _service;
     private readonly RetentionPolicy _defaultPolicy;
 
@@ -20,7 +22,8 @@ public class RetentionCleanupServiceTests
     {
         _repositoryMock = new Mock<IBackupJobRepository>();
         _fileDeleterMock = new Mock<IBackupFileDeleter>();
-        _service = new RetentionCleanupService(_repositoryMock.Object, _fileDeleterMock.Object);
+        _loggerMock = new Mock<ILogger<RetentionCleanupService>>();
+        _service = new RetentionCleanupService(_repositoryMock.Object, _fileDeleterMock.Object, _loggerMock.Object);
         _defaultPolicy = new RetentionPolicy(
             fullBackupRetention: TimeSpan.FromDays(30),
             differentialBackupRetention: TimeSpan.FromDays(14),
