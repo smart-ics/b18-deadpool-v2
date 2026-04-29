@@ -1,4 +1,5 @@
 using Deadpool.Agent.Configuration;
+using Deadpool.Agent.Infrastructure;
 using Deadpool.Agent.Workers;
 using Deadpool.Core.Domain.ValueObjects;
 using Deadpool.Core.Interfaces;
@@ -110,7 +111,19 @@ builder.Services.AddSingleton<BackupFilePathService>(sp =>
 // BackupService (still used by existing code, but execution worker uses IBackupExecutor directly)
 builder.Services.AddSingleton<BackupService>();
 
-// Hosted workers
+// Bootstrap state tracker and initialization service
+builder.Services.AddSingleton<IBootstrapStateTracker, InMemoryBootstrapStateTracker>();
+builder.Services.AddSingleton<IBackupChainInitializationService, BackupChainInitializationService>();
+
+// Hosted workers.
+// Safety note: all BackgroundService.ExecuteAsync methods start concurrently —
+// registration order does NOT guarantee sequential startup.
+// Race safety for bootstrap is provided by:
+//   - InMemoryBootstrapStateTracker defaults to BootstrapPending for all databases
+//   - BackupSchedulerWorker.TryScheduleAsync blocks Diff/Log until status = Initialized
+//   - BootstrapWorker seeds IScheduleTracker for Full after success, preventing a
+//     duplicate cron-driven Full job on the scheduler's first tick.
+builder.Services.AddHostedService<BootstrapWorker>();
 builder.Services.AddHostedService<BackupSchedulerWorker>();
 builder.Services.AddHostedService<BackupExecutionWorker>();
 builder.Services.AddHostedService<BackupHealthMonitoringWorker>();

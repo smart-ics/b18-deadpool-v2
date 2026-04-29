@@ -1,4 +1,5 @@
 using Deadpool.Agent.Configuration;
+using Deadpool.Agent.Infrastructure;
 using Deadpool.Agent.Workers;
 using Deadpool.Core.Domain.Entities;
 using Deadpool.Core.Domain.Enums;
@@ -19,7 +20,8 @@ public class BackupSchedulerWorkerTests
     private static BackupSchedulerWorker BuildWorker(
         Mock<IBackupJobRepository> repoMock,
         IScheduleTracker? tracker = null,
-        List<DatabaseBackupPolicyOptions>? policies = null)
+        List<DatabaseBackupPolicyOptions>? policies = null,
+        IBootstrapStateTracker? bootstrapStateTracker = null)
     {
         policies ??= new List<DatabaseBackupPolicyOptions>
         {
@@ -34,11 +36,31 @@ public class BackupSchedulerWorkerTests
 
         tracker ??= new InMemoryScheduleTracker();
 
+        // Default: all databases are initialized (chain ready) so existing tests keep passing.
+        bootstrapStateTracker ??= InitializedBootstrapTracker(policies.Select(p => p.DatabaseName).ToArray());
+
         return new BackupSchedulerWorker(
             NullLogger<BackupSchedulerWorker>.Instance,
             repoMock.Object,
             tracker,
+            bootstrapStateTracker,
             Options.Create(policies));
+    }
+
+    private static IBootstrapStateTracker InitializedBootstrapTracker(params string[] databaseNames)
+    {
+        var tracker = new InMemoryBootstrapStateTracker();
+        foreach (var db in databaseNames)
+            tracker.SetStatus(db, BackupChainInitializationStatus.Initialized);
+        return tracker;
+    }
+
+    private static IBootstrapStateTracker UninitializedBootstrapTracker(params string[] databaseNames)
+    {
+        var tracker = new InMemoryBootstrapStateTracker();
+        foreach (var db in databaseNames)
+            tracker.SetStatus(db, BackupChainInitializationStatus.BootstrapPending);
+        return tracker;
     }
 
     private static Mock<IBackupJobRepository> EmptyRepo()
@@ -60,6 +82,7 @@ public class BackupSchedulerWorkerTests
             NullLogger<BackupSchedulerWorker>.Instance,
             EmptyRepo().Object,
             new InMemoryScheduleTracker(),
+            new InMemoryBootstrapStateTracker(),
             null!);
 
         act.Should().Throw<ArgumentNullException>();
@@ -318,5 +341,81 @@ public class BackupSchedulerWorkerTests
         captured!.BackupFilePath.Should().StartWith("PENDING_");
         captured.BackupFilePath.Should().EndWith(".trn");
         captured.Status.Should().Be(BackupStatus.Pending);
+    }
+
+    // ── Bootstrap guard ──────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Tick_ShouldSkipDifferential_WhenChainNotInitialized()
+    {
+        var repo = EmptyRepo();
+        var tracker = new InMemoryScheduleTracker();
+        var bootstrapTracker = UninitializedBootstrapTracker("TestDB");
+        var worker = BuildWorker(repo, tracker, bootstrapStateTracker: bootstrapTracker);
+
+        // Tick at a time when diff is due (01:01)
+        var now = new DateTime(2024, 1, 1, 1, 1, 0, DateTimeKind.Utc);
+
+        await worker.TickAsync(now, CancellationToken.None);
+
+        repo.Verify(r => r.CreateAsync(
+            It.Is<BackupJob>(j => j.BackupType == BackupType.Differential)),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Tick_ShouldSkipTransactionLog_WhenChainNotInitialized()
+    {
+        var repo = EmptyRepo();
+        var tracker = new InMemoryScheduleTracker();
+        var bootstrapTracker = UninitializedBootstrapTracker("TestDB");
+        var worker = BuildWorker(repo, tracker, bootstrapStateTracker: bootstrapTracker);
+
+        var now = new DateTime(2024, 1, 1, 12, 16, 0, DateTimeKind.Utc);
+
+        await worker.TickAsync(now, CancellationToken.None);
+
+        repo.Verify(r => r.CreateAsync(
+            It.Is<BackupJob>(j => j.BackupType == BackupType.TransactionLog)),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Tick_ShouldSkipDifferential_WhenBootstrapFailed()
+    {
+        var repo = EmptyRepo();
+        var tracker = new InMemoryScheduleTracker();
+        var bootstrapTracker = new InMemoryBootstrapStateTracker();
+        bootstrapTracker.SetStatus("TestDB", BackupChainInitializationStatus.BootstrapFailed);
+
+        var worker = BuildWorker(repo, tracker, bootstrapStateTracker: bootstrapTracker);
+        var now = new DateTime(2024, 1, 1, 1, 1, 0, DateTimeKind.Utc);
+
+        await worker.TickAsync(now, CancellationToken.None);
+
+        repo.Verify(r => r.CreateAsync(
+            It.Is<BackupJob>(j => j.BackupType == BackupType.Differential)),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Tick_ShouldAllowDifferential_WhenChainInitialized()
+    {
+        var repo = EmptyRepo();
+        var tracker = new InMemoryScheduleTracker();
+        // Seed Full as already done so only diff fires
+        tracker.MarkScheduled("TestDB", BackupType.Full,
+            new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc));
+
+        var bootstrapTracker = InitializedBootstrapTracker("TestDB");
+        var worker = BuildWorker(repo, tracker, bootstrapStateTracker: bootstrapTracker);
+
+        var now = new DateTime(2024, 1, 1, 1, 1, 0, DateTimeKind.Utc);
+
+        await worker.TickAsync(now, CancellationToken.None);
+
+        repo.Verify(r => r.CreateAsync(
+            It.Is<BackupJob>(j => j.BackupType == BackupType.Differential)),
+            Times.Once);
     }
 }

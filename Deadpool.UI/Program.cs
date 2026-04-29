@@ -70,9 +70,27 @@ static class Program
             return new SqliteBackupJobRepository(sqlitePath, logger);
         });
 
-        // Core services
+        // Storage monitoring service with proper options injection
+        services.AddSingleton<IStorageMonitoringService>(sp =>
+        {
+            var storageInfoProvider = sp.GetRequiredService<IStorageInfoProvider>();
+
+            // Load storage health options from configuration or use defaults
+            var storageConfig = configuration.GetSection("StorageHealth");
+            var storageHealthOptions = storageConfig.Exists()
+                ? new Deadpool.Core.Domain.ValueObjects.StorageHealthOptions(
+                    warningThresholdPercentage: storageConfig.GetValue<decimal>("WarningThresholdPercentage", 20m),
+                    criticalThresholdPercentage: storageConfig.GetValue<decimal>("CriticalThresholdPercentage", 10m),
+                    minimumWarningFreeSpaceBytes: storageConfig.GetValue<long>("MinimumWarningFreeSpaceGB", 50L) * 1024L * 1024 * 1024,
+                    minimumCriticalFreeSpaceBytes: storageConfig.GetValue<long>("MinimumCriticalFreeSpaceGB", 20L) * 1024L * 1024 * 1024)
+                : Deadpool.Core.Domain.ValueObjects.StorageHealthOptions.Default;
+
+            // BackupSizeEstimator is optional for UI (not needed for display-only monitoring)
+            return new StorageMonitoringService(storageInfoProvider, storageHealthOptions, backupSizeEstimator: null);
+        });
+
+        // Core dashboard services
         services.AddSingleton<IDashboardMonitoringService, DashboardMonitoringService>();
-        services.AddSingleton<IStorageMonitoringService, StorageMonitoringService>();
         services.AddSingleton<IBackupJobMonitoringService, BackupJobMonitoringService>();
 
         // Other repositories (still in-memory for now)

@@ -4,6 +4,7 @@ using Deadpool.Core.Domain.Enums;
 using Deadpool.Core.Domain.ValueObjects;
 using Deadpool.Core.Interfaces;
 using Microsoft.Extensions.Options;
+using Deadpool.Agent.Infrastructure;
 
 namespace Deadpool.Agent.Workers;
 
@@ -18,17 +19,20 @@ public sealed class BackupSchedulerWorker : BackgroundService
     private readonly ILogger<BackupSchedulerWorker> _logger;
     private readonly IBackupJobRepository _jobRepository;
     private readonly IScheduleTracker _tracker;
+    private readonly IBootstrapStateTracker _bootstrapStateTracker;
     private readonly IReadOnlyList<ScheduledDatabase> _databases;
 
     public BackupSchedulerWorker(
         ILogger<BackupSchedulerWorker> logger,
         IBackupJobRepository jobRepository,
         IScheduleTracker tracker,
+        IBootstrapStateTracker bootstrapStateTracker,
         IOptions<List<DatabaseBackupPolicyOptions>> policiesOptions)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _jobRepository = jobRepository ?? throw new ArgumentNullException(nameof(jobRepository));
         _tracker = tracker ?? throw new ArgumentNullException(nameof(tracker));
+        _bootstrapStateTracker = bootstrapStateTracker ?? throw new ArgumentNullException(nameof(bootstrapStateTracker));
 
         var raw = policiesOptions?.Value
             ?? throw new ArgumentNullException(nameof(policiesOptions));
@@ -119,6 +123,19 @@ public sealed class BackupSchedulerWorker : BackgroundService
         BackupSchedule schedule,
         DateTime nowUtc)
     {
+        // Domain safety rule: Differential and Log backups require an initialized chain.
+        if (backupType != BackupType.Full)
+        {
+            var chainStatus = _bootstrapStateTracker.GetStatus(databaseName);
+            if (chainStatus != BackupChainInitializationStatus.Initialized)
+            {
+                _logger.LogWarning(
+                    "Skipping {Type} backup for {Db}: chain not initialized (status={Status}).",
+                    backupType, databaseName, chainStatus);
+                return;
+            }
+        }
+
         var lastScheduled = _tracker.GetLastScheduled(databaseName, backupType);
 
         if (!schedule.IsDue(lastScheduled, nowUtc))

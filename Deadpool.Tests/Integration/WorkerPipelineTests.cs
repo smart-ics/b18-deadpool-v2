@@ -1,4 +1,5 @@
 using Deadpool.Agent.Configuration;
+using Deadpool.Agent.Infrastructure;
 using Deadpool.Agent.Workers;
 using Deadpool.Core.Domain.Entities;
 using Deadpool.Core.Domain.Enums;
@@ -27,10 +28,14 @@ public class WorkerPipelineTests
         var backupExecutor = new StubBackupExecutor();
         var metadataService = new StubDatabaseMetadataService();
 
+        var bootstrapTracker = new InMemoryBootstrapStateTracker();
+        bootstrapTracker.SetStatus(policies[0].DatabaseName, Deadpool.Core.Domain.Enums.BackupChainInitializationStatus.Initialized);
+
         var scheduler = new BackupSchedulerWorker(
             NullLogger<BackupSchedulerWorker>.Instance,
             repo,
             tracker,
+            bootstrapTracker,
             Options.Create(policies));
 
         var executor = new BackupExecutionWorker(
@@ -232,10 +237,14 @@ public class WorkerPipelineTests
         var tracker = new InMemoryScheduleTracker();
 
         // First scheduler run
+        var bootstrapTracker = new InMemoryBootstrapStateTracker();
+        bootstrapTracker.SetStatus("TestDB", Deadpool.Core.Domain.Enums.BackupChainInitializationStatus.Initialized);
+
         var scheduler1 = new BackupSchedulerWorker(
             NullLogger<BackupSchedulerWorker>.Instance,
             repo,
             tracker,
+            bootstrapTracker,
             Options.Create(policies));
 
         var now = new DateTime(2024, 1, 1, 12, 1, 0, DateTimeKind.Utc);
@@ -250,6 +259,7 @@ public class WorkerPipelineTests
             NullLogger<BackupSchedulerWorker>.Instance,
             repo,
             tracker,
+            bootstrapTracker,
             Options.Create(policies));
 
         // Act - Same time, should not create duplicate

@@ -302,6 +302,125 @@ Important Phase-2 foundation.
 
 ---
 
+## EPIC-8 Operational Readiness Enhancements
+
+Goal:
+
+Improve operational safety and operator visibility for production deployment readiness.
+
+---
+
+### P1-014 Bootstrap Initial Full Backup
+
+Status: Todo
+
+Implement startup behavior:
+
+- Detect when no valid Full backup chain exists
+- Automatically trigger bootstrap Full backup
+- After bootstrap, continue normal backup schedule
+
+Rules:
+
+- Full backup bootstrap occurs once when chain not initialized
+- Differential and Log backups must not run before valid Full exists
+- Surface "Backup Chain Initialized" status
+
+Requires:
+- DBA review mandatory
+
+High priority safety enhancement.
+
+---
+
+### P2-015 Display Backup Policy in Plain English
+
+Status: Todo
+
+Enhance UI dashboard to display configured backup policy in operator-friendly language.
+
+Show:
+
+- Full backup schedule in plain English
+- Differential backup schedule in plain English
+- Log backup schedule in plain English
+- Recovery model
+- Retention policy
+
+Example:
+
+- Full Backup runs at midnight every Sunday
+- Differential Backup runs at midnight Monday through Saturday
+- Transaction Log Backup runs every 15 minutes
+
+Focus:
+- No raw cron expressions shown to operators
+
+---
+
+### P2-016 Show Database and Backup Topology Status
+
+Status: Todo
+
+Display configuration and topology information in UI:
+
+Show:
+
+- Production database name
+- SQL Server address / instance
+- Backup storage server location
+- Connection endpoints summary
+
+Goal:
+
+Operator can verify what is being protected.
+
+---
+
+### P1-017 Production Database Pulse Monitoring
+
+Status: Todo
+
+Implement monitoring for production database availability.
+
+Monitor:
+
+- Database reachable/unreachable
+- Simple database pulse check
+- Database online status
+
+Display:
+
+- Healthy
+- Warning
+- Critical
+
+Constraints:
+
+- Simple availability monitoring only
+- Not a SQL performance monitoring tool
+
+Requires:
+- DBA review
+
+---
+
+### P2-018 Show Backup Chain Initialization Status
+
+Status: Todo
+
+Display in dashboard:
+
+- Backup Chain Initialized: Yes/No
+- Last valid Full backup
+- Restore chain currently healthy/unhealthy
+
+Warn clearly if system not yet protected.
+
+Depends on:
+- P1-014
+
+
 ## Technical Debt Queue
 
 Future improvements:
