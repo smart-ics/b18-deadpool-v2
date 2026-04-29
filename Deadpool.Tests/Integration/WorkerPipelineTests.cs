@@ -13,6 +13,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
 namespace Deadpool.Tests.Integration;
+
 public class WorkerPipelineTests
 {
     // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -32,25 +33,12 @@ public class WorkerPipelineTests
             tracker,
             Options.Create(policies));
 
-        var executorOptions = new ExecutionWorkerOptions
-        {
-            StaleJobThreshold = TimeSpan.FromHours(2)
-        };
-
-        var copyOptions = new BackupCopyOptions
-        {
-            RemoteStoragePath = "" // Disabled by default in tests
-        };
-
         var executor = new BackupExecutionWorker(
             NullLogger<BackupExecutionWorker>.Instance,
             repo,
             backupExecutor,
             filePathService,
-            metadataService,
-            Options.Create(executorOptions),
-            Options.Create(copyOptions),
-            copyService: null);
+            metadataService);
 
         return (scheduler, executor, repo);
     }
@@ -133,31 +121,20 @@ public class WorkerPipelineTests
         var backupExecutor = new StubBackupExecutor();
         var metadataService = new StubDatabaseMetadataService();
 
-        var executorOptions = new ExecutionWorkerOptions
-        {
-            StaleJobThreshold = TimeSpan.FromHours(2)
-        };
-
-        var copyOptions = new BackupCopyOptions { RemoteStoragePath = "" };
-
         // Create two executor workers
         var executor1 = new BackupExecutionWorker(
             NullLogger<BackupExecutionWorker>.Instance,
             repo,
             backupExecutor,
             filePathService,
-            metadataService,
-            Options.Create(executorOptions),
-            Options.Create(copyOptions));
+            metadataService);
 
         var executor2 = new BackupExecutionWorker(
             NullLogger<BackupExecutionWorker>.Instance,
             repo,
             backupExecutor,
             filePathService,
-            metadataService,
-            Options.Create(executorOptions),
-            Options.Create(copyOptions));
+            metadataService);
 
         // Create pending job
         var job = new BackupJob("TestDB", BackupType.Full, "C:\\Backups\\test.bak");
@@ -220,21 +197,12 @@ public class WorkerPipelineTests
         var failingExecutor = new FailingBackupExecutor();
         var metadataService = new StubDatabaseMetadataService();
 
-        var executorOptions = new ExecutionWorkerOptions
-        {
-            StaleJobThreshold = TimeSpan.FromHours(2)
-        };
-
-        var copyOptions = new BackupCopyOptions { RemoteStoragePath = "" };
-
         var executor = new BackupExecutionWorker(
             NullLogger<BackupExecutionWorker>.Instance,
             repo,
             failingExecutor,
             filePathService,
-            metadataService,
-            Options.Create(executorOptions),
-            Options.Create(copyOptions));
+            metadataService);
 
         // Create pending job
         var job = new BackupJob("TestDB", BackupType.Full, "C:\\Backups\\test.bak");
@@ -291,131 +259,6 @@ public class WorkerPipelineTests
         var jobsAfterRestart = await repo.GetPendingJobsAsync(10);
         var fullJobCountAfter = jobsAfterRestart.Count(j => j.BackupType == BackupType.Full);
         fullJobCountAfter.Should().Be(1); // Still only one full backup job
-    }
-
-    // ── Stale Job Recovery ───────────────────────────────────────────────────────
-
-    [Fact]
-    public async Task Executor_ShouldRecoverStaleRunningJob()
-    {
-        // Arrange
-        var repo = new InMemoryBackupJobRepository();
-        var filePathService = new BackupFilePathService("C:\\Backups");
-        var backupExecutor = new StubBackupExecutor();
-        var metadataService = new StubDatabaseMetadataService();
-
-        // Create a job and mark it as Running (simulating executor crash)
-        var job = new BackupJob("TestDB", BackupType.Full, "C:\\Backups\\test.bak");
-        await repo.CreateAsync(job);
-        job.MarkAsRunning();
-
-        // Simulate the job being stale (started > 2 hours ago)
-        // We'll use a very short threshold for testing
-        var executorOptions = new ExecutionWorkerOptions
-        {
-            StaleJobThreshold = TimeSpan.FromMilliseconds(100)
-        };
-
-        await Task.Delay(150); // Ensure job is stale
-
-        var copyOptions = new BackupCopyOptions { RemoteStoragePath = "" };
-
-        var executor = new BackupExecutionWorker(
-            NullLogger<BackupExecutionWorker>.Instance,
-            repo,
-            backupExecutor,
-            filePathService,
-            metadataService,
-            Options.Create(executorOptions),
-            Options.Create(copyOptions));
-
-        // Act - Executor should pick up and complete the stale job
-        var cts = new CancellationTokenSource();
-        var executorTask = executor.StartAsync(cts.Token);
-        await Task.Delay(1000);
-        await cts.CancelAsync();
-        await executorTask;
-
-        // Assert
-        job.Status.Should().Be(BackupStatus.Completed);
-        job.FileSizeBytes.Should().BeGreaterThan(0);
-        job.EndTime.Should().NotBeNull();
-    }
-
-    [Fact]
-    public async Task Executor_ShouldNotPickUpRecentRunningJob()
-    {
-        // Arrange
-        var repo = new InMemoryBackupJobRepository();
-        var filePathService = new BackupFilePathService("C:\\Backups");
-        var backupExecutor = new StubBackupExecutor();
-        var metadataService = new StubDatabaseMetadataService();
-
-        // Create a job and mark it as Running
-        var job = new BackupJob("TestDB", BackupType.Full, "C:\\Backups\\test.bak");
-        await repo.CreateAsync(job);
-        job.MarkAsRunning();
-
-        // Use long threshold - job is NOT stale yet
-        var executorOptions = new ExecutionWorkerOptions
-        {
-            StaleJobThreshold = TimeSpan.FromHours(2)
-        };
-
-        var copyOptions = new BackupCopyOptions { RemoteStoragePath = "" };
-
-        var executor = new BackupExecutionWorker(
-            NullLogger<BackupExecutionWorker>.Instance,
-            repo,
-            backupExecutor,
-            filePathService,
-            metadataService,
-            Options.Create(executorOptions),
-            Options.Create(copyOptions));
-
-        // Act - Executor should NOT pick up the recent Running job
-        var cts = new CancellationTokenSource();
-        var executorTask = executor.StartAsync(cts.Token);
-        await Task.Delay(500);
-        await cts.CancelAsync();
-        await executorTask;
-
-        // Assert - Job should still be Running (not completed)
-        job.Status.Should().Be(BackupStatus.Running);
-        job.FileSizeBytes.Should().BeNull();
-        job.EndTime.Should().BeNull();
-    }
-
-    [Fact]
-    public async Task Repository_GetPendingOrStaleJobsAsync_ShouldReturnBothPendingAndStale()
-    {
-        // Arrange
-        var repo = new InMemoryBackupJobRepository();
-
-        // Create pending job
-        var pendingJob = new BackupJob("DB1", BackupType.Full, "C:\\pending.bak");
-        await repo.CreateAsync(pendingJob);
-
-        // Create stale running job
-        var staleJob = new BackupJob("DB2", BackupType.Differential, "C:\\stale.bak");
-        await repo.CreateAsync(staleJob);
-        staleJob.MarkAsRunning();
-
-        await Task.Delay(150); // Make staleJob actually stale
-
-        // Create recent running job AFTER the delay
-        var recentJob = new BackupJob("DB3", BackupType.TransactionLog, "C:\\recent.bak");
-        await repo.CreateAsync(recentJob);
-        recentJob.MarkAsRunning();
-
-        // Act
-        var jobs = await repo.GetPendingOrStaleJobsAsync(maxCount: 10, TimeSpan.FromMilliseconds(100));
-
-        // Assert
-        var jobList = jobs.ToList();
-        jobList.Should().Contain(j => j.DatabaseName == "DB1"); // Pending
-        jobList.Should().Contain(j => j.DatabaseName == "DB2"); // Stale Running
-        jobList.Should().NotContain(j => j.DatabaseName == "DB3"); // Recent Running (not stale)
     }
 
     // ── Helper: Failing Executor ─────────────────────────────────────────────────

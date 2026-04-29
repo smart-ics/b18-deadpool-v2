@@ -1,5 +1,6 @@
 using Deadpool.Agent.Configuration;
 using Deadpool.Agent.Workers;
+using Deadpool.Core.Domain.ValueObjects;
 using Deadpool.Core.Interfaces;
 using Deadpool.Core.Services;
 using Deadpool.Infrastructure.BackupExecution;
@@ -23,13 +24,34 @@ builder.Services.Configure<ExecutionWorkerOptions>(
 builder.Services.Configure<BackupCopyOptions>(
     builder.Configuration.GetSection("BackupCopy"));
 
+// Health monitoring configuration
+builder.Services.Configure<HealthMonitoringOptions>(
+    builder.Configuration.GetSection("HealthMonitoring"));
+
 // Core services
 builder.Services.AddSingleton<IBackupJobRepository, InMemoryBackupJobRepository>();
+builder.Services.AddSingleton<IBackupHealthCheckRepository, InMemoryBackupHealthCheckRepository>();
 builder.Services.AddSingleton<IScheduleTracker, InMemoryScheduleTracker>();
 
 // Backup execution dependencies (using stubs for now)
 builder.Services.AddSingleton<IBackupExecutor, StubBackupExecutor>();
 builder.Services.AddSingleton<IDatabaseMetadataService, StubDatabaseMetadataService>();
+
+// Health monitoring service
+builder.Services.AddSingleton<IBackupHealthMonitoringService>(sp =>
+{
+    var healthOptions = sp.GetRequiredService<IOptions<HealthMonitoringOptions>>().Value;
+    var repository = sp.GetRequiredService<IBackupJobRepository>();
+
+    var backupHealthOptions = new BackupHealthOptions(
+        fullBackupOverdueThreshold: healthOptions.FullBackupOverdueThreshold,
+        differentialBackupOverdueThreshold: healthOptions.DifferentialBackupOverdueThreshold,
+        logBackupOverdueThreshold: healthOptions.LogBackupOverdueThreshold,
+        chainLookbackPeriod: healthOptions.ChainLookbackPeriod
+    );
+
+    return new BackupHealthMonitoringService(repository, backupHealthOptions);
+});
 
 // Backup file copy service (conditional registration based on configuration)
 builder.Services.AddSingleton<IBackupFileCopyService?>(sp =>
@@ -58,6 +80,7 @@ builder.Services.AddSingleton<BackupService>();
 // Hosted workers
 builder.Services.AddHostedService<BackupSchedulerWorker>();
 builder.Services.AddHostedService<BackupExecutionWorker>();
+builder.Services.AddHostedService<BackupHealthMonitoringWorker>();
 
 var host = builder.Build();
 host.Run();

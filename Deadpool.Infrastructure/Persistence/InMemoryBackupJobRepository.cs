@@ -107,23 +107,6 @@ public sealed class InMemoryBackupJobRepository : IBackupJobRepository
         }
     }
 
-    public Task<IEnumerable<BackupJob>> GetPendingOrStaleJobsAsync(int maxCount, TimeSpan staleThreshold)
-    {
-        lock (_lock)
-        {
-            var now = DateTime.UtcNow;
-
-            var pendingOrStale = _jobs
-                .Where(j => j.Status == BackupStatus.Pending ||
-                            (j.Status == BackupStatus.Running && IsStale(j, now, staleThreshold)))
-                .OrderBy(j => j.StartTime)
-                .Take(maxCount)
-                .ToList();
-
-            return Task.FromResult<IEnumerable<BackupJob>>(pendingOrStale);
-        }
-    }
-
     public Task<bool> TryClaimJobAsync(BackupJob job)
     {
         if (job == null)
@@ -131,21 +114,13 @@ public sealed class InMemoryBackupJobRepository : IBackupJobRepository
 
         lock (_lock)
         {
-            // Check if job is still claimable (Pending or stale Running)
-            // Stale Running jobs can be reclaimed after executor crash
-            if (job.Status != BackupStatus.Pending && job.Status != BackupStatus.Running)
+            // Check if job is still pending (another worker might have claimed it)
+            if (job.Status != BackupStatus.Pending)
                 return Task.FromResult(false);
 
             try
             {
-                // If already Running (stale), reset to Running (idempotent)
-                // If Pending, transition to Running
-                if (job.Status == BackupStatus.Pending)
-                {
-                    job.MarkAsRunning();
-                }
-                // else: already Running (stale), reclaiming is allowed
-
+                job.MarkAsRunning();
                 return Task.FromResult(true);
             }
             catch (InvalidOperationException)
@@ -155,9 +130,57 @@ public sealed class InMemoryBackupJobRepository : IBackupJobRepository
         }
     }
 
-    private static bool IsStale(BackupJob job, DateTime now, TimeSpan staleThreshold)
+    public Task<BackupJob?> GetLastSuccessfulBackupAsync(string databaseName, BackupType backupType)
     {
-        return (now - job.StartTime) > staleThreshold;
+        if (string.IsNullOrWhiteSpace(databaseName))
+            throw new ArgumentException("Database name cannot be empty.", nameof(databaseName));
+
+        lock (_lock)
+        {
+            var lastBackup = _jobs
+                .Where(j => j.DatabaseName == databaseName)
+                .Where(j => j.BackupType == backupType)
+                .Where(j => j.Status == BackupStatus.Completed)
+                .OrderByDescending(j => j.StartTime)
+                .FirstOrDefault();
+
+            return Task.FromResult(lastBackup);
+        }
+    }
+
+    public Task<BackupJob?> GetLastFailedBackupAsync(string databaseName)
+    {
+        if (string.IsNullOrWhiteSpace(databaseName))
+            throw new ArgumentException("Database name cannot be empty.", nameof(databaseName));
+
+        lock (_lock)
+        {
+            var lastFailed = _jobs
+                .Where(j => j.DatabaseName == databaseName)
+                .Where(j => j.Status == BackupStatus.Failed)
+                .OrderByDescending(j => j.StartTime)
+                .FirstOrDefault();
+
+            return Task.FromResult(lastFailed);
+        }
+    }
+
+    public Task<IEnumerable<BackupJob>> GetBackupChainAsync(string databaseName, DateTime since)
+    {
+        if (string.IsNullOrWhiteSpace(databaseName))
+            throw new ArgumentException("Database name cannot be empty.", nameof(databaseName));
+
+        lock (_lock)
+        {
+            var chain = _jobs
+                .Where(j => j.DatabaseName == databaseName)
+                .Where(j => j.Status == BackupStatus.Completed)
+                .Where(j => j.StartTime >= since)
+                .OrderBy(j => j.StartTime)
+                .ToList();
+
+            return Task.FromResult<IEnumerable<BackupJob>>(chain);
+        }
     }
 
     // Helper for testing - not part of interface

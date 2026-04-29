@@ -1,15 +1,13 @@
-using Deadpool.Agent.Configuration;
 using Deadpool.Core.Domain.Entities;
 using Deadpool.Core.Domain.Enums;
 using Deadpool.Core.Interfaces;
 using Deadpool.Core.Services;
-using Microsoft.Extensions.Options;
 
 namespace Deadpool.Agent.Workers;
 
 // Polls for pending backup jobs and executes them.
 // Execution flow:
-// 1. Query pending jobs (including stale Running jobs for recovery)
+// 1. Query pending jobs
 // 2. Claim job (mark as Running)
 // 3. Execute backup directly via IBackupExecutor
 // 4. Update job status (Completed or Failed)
@@ -22,42 +20,24 @@ public sealed class BackupExecutionWorker : BackgroundService
     private readonly IBackupExecutor _backupExecutor;
     private readonly BackupFilePathService _filePathService;
     private readonly IDatabaseMetadataService _databaseMetadataService;
-    private readonly IBackupFileCopyService? _copyService;
-    private readonly bool _copyEnabled;
-    private readonly TimeSpan _staleJobThreshold;
 
     public BackupExecutionWorker(
         ILogger<BackupExecutionWorker> logger,
         IBackupJobRepository jobRepository,
         IBackupExecutor backupExecutor,
         BackupFilePathService filePathService,
-        IDatabaseMetadataService databaseMetadataService,
-        IOptions<ExecutionWorkerOptions> options,
-        IOptions<BackupCopyOptions> copyOptions,
-        IBackupFileCopyService? copyService = null)
+        IDatabaseMetadataService databaseMetadataService)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _jobRepository = jobRepository ?? throw new ArgumentNullException(nameof(jobRepository));
         _backupExecutor = backupExecutor ?? throw new ArgumentNullException(nameof(backupExecutor));
         _filePathService = filePathService ?? throw new ArgumentNullException(nameof(filePathService));
         _databaseMetadataService = databaseMetadataService ?? throw new ArgumentNullException(nameof(databaseMetadataService));
-
-        var opts = options?.Value ?? throw new ArgumentNullException(nameof(options));
-        _staleJobThreshold = opts.StaleJobThreshold;
-
-        var copyOpts = copyOptions?.Value ?? throw new ArgumentNullException(nameof(copyOptions));
-        _copyEnabled = copyOpts.Enabled;
-        _copyService = copyService;
-
-        if (_copyEnabled && _copyService == null)
-            throw new InvalidOperationException("Copy is enabled but IBackupFileCopyService is not registered.");
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation(
-            "BackupExecutionWorker started. Stale job threshold: {Threshold}",
-            _staleJobThreshold);
+        _logger.LogInformation("BackupExecutionWorker started.");
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -78,8 +58,7 @@ public sealed class BackupExecutionWorker : BackgroundService
 
     private async Task ProcessPendingJobsAsync(CancellationToken cancellationToken)
     {
-        // Query pending jobs AND stale Running jobs (for crash recovery)
-        var pendingJobs = await _jobRepository.GetPendingOrStaleJobsAsync(maxCount: 10, _staleJobThreshold);
+        var pendingJobs = await _jobRepository.GetPendingJobsAsync(maxCount: 10);
 
         foreach (var job in pendingJobs)
         {
@@ -94,7 +73,7 @@ public sealed class BackupExecutionWorker : BackgroundService
     {
         try
         {
-            // Attempt to claim the job (transition Pending → Running, or reclaim stale Running)
+            // Attempt to claim the job (transition Pending → Running)
             var claimed = await _jobRepository.TryClaimJobAsync(job);
             if (!claimed)
             {
@@ -102,14 +81,6 @@ public sealed class BackupExecutionWorker : BackgroundService
                     "Job already claimed by another worker: {Database} {Type}",
                     job.DatabaseName, job.BackupType);
                 return;
-            }
-
-            // Log if this is a recovery of a stale job
-            if (job.Status == BackupStatus.Running)
-            {
-                _logger.LogWarning(
-                    "Recovering stale Running job for {Database} {Type} (started {StartTime:u}, age {Age})",
-                    job.DatabaseName, job.BackupType, job.StartTime, DateTime.UtcNow - job.StartTime);
             }
 
             _logger.LogInformation(
@@ -133,12 +104,6 @@ public sealed class BackupExecutionWorker : BackgroundService
             _logger.LogInformation(
                 "Successfully completed {Type} backup for {Database}",
                 job.BackupType, job.DatabaseName);
-
-            // Copy to remote storage (if enabled)
-            if (_copyEnabled && _copyService != null)
-            {
-                await TryCopyBackupFileAsync(job, backupFilePath);
-            }
         }
         catch (Exception ex)
         {
@@ -146,7 +111,6 @@ public sealed class BackupExecutionWorker : BackgroundService
                 "Failed to execute {Type} backup for {Database}: {Message}",
                 job.BackupType, job.DatabaseName, ex.Message);
 
-            // Attempt to mark job as failed
             try
             {
                 job.MarkAsFailed(ex.Message);
@@ -154,15 +118,9 @@ public sealed class BackupExecutionWorker : BackgroundService
             }
             catch (Exception updateEx)
             {
-                // CRITICAL: Failed to update job status after execution failure.
-                // Job may be stuck in Running state. Requires operator intervention.
-                _logger.LogCritical(updateEx,
-                    "CRITICAL: Failed to mark job as Failed for {Database} {Type}. " +
-                    "Job may be stuck in Running state. Original error: {OriginalError}",
-                    job.DatabaseName, job.BackupType, ex.Message);
-
-                // Job will be recovered on next poll cycle via stale job detection,
-                // but operator should be alerted to investigate root cause.
+                _logger.LogError(updateEx,
+                    "Failed to update job status to Failed for {Database} {Type}",
+                    job.DatabaseName, job.BackupType);
             }
         }
     }
@@ -221,52 +179,5 @@ public sealed class BackupExecutionWorker : BackgroundService
             throw new FileNotFoundException($"Backup file not found: {backupFilePath}");
 
         return new FileInfo(backupFilePath).Length;
-    }
-
-    private async Task TryCopyBackupFileAsync(BackupJob job, string backupFilePath)
-    {
-        try
-        {
-            _logger.LogInformation(
-                "Starting backup file copy for {Database} {Type}",
-                job.DatabaseName, job.BackupType);
-
-            // Determine destination path
-            var destinationPath = await _copyService!.CopyBackupFileAsync(
-                backupFilePath,
-                job.DatabaseName,
-                job.BackupType);
-
-            job.MarkCopyStarted(destinationPath);
-            job.MarkCopyCompleted();
-            await _jobRepository.UpdateAsync(job);
-
-            _logger.LogInformation(
-                "Backup file copied successfully: {Destination} (duration: {Duration})",
-                destinationPath, job.GetCopyDuration());
-        }
-        catch (Exception ex)
-        {
-            // Copy failure does NOT endanger the original backup
-            _logger.LogError(ex,
-                "Failed to copy backup file for {Database} {Type}: {Message}. " +
-                "Local backup remains intact at {Path}",
-                job.DatabaseName, job.BackupType, ex.Message, backupFilePath);
-
-            try
-            {
-                job.MarkCopyStarted(backupFilePath); // Record attempt even if failed
-                job.MarkCopyFailed(ex.Message);
-                await _jobRepository.UpdateAsync(job);
-            }
-            catch (Exception updateEx)
-            {
-                _logger.LogWarning(updateEx,
-                    "Failed to update copy failure status for {Database} {Type}",
-                    job.DatabaseName, job.BackupType);
-            }
-
-            // Do not propagate exception - local backup succeeded
-        }
     }
 }

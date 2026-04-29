@@ -14,6 +14,10 @@ public interface IBackupJobRepository
 
     // Job claiming for execution worker
     Task<IEnumerable<BackupJob>> GetPendingJobsAsync(int maxCount);
-    Task<IEnumerable<BackupJob>> GetPendingOrStaleJobsAsync(int maxCount, TimeSpan staleThreshold);
     Task<bool> TryClaimJobAsync(BackupJob job);
+
+    // Health monitoring queries
+    Task<BackupJob?> GetLastSuccessfulBackupAsync(string databaseName, BackupType backupType);
+    Task<BackupJob?> GetLastFailedBackupAsync(string databaseName);
+    Task<IEnumerable<BackupJob>> GetBackupChainAsync(string databaseName, DateTime since);
 }
