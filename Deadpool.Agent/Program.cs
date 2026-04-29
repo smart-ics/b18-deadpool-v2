@@ -28,10 +28,19 @@ builder.Services.Configure<BackupCopyOptions>(
 builder.Services.Configure<HealthMonitoringOptions>(
     builder.Configuration.GetSection("HealthMonitoring"));
 
+// Storage monitoring configuration
+builder.Services.Configure<StorageMonitoringOptions>(
+    builder.Configuration.GetSection("StorageMonitoring"));
+
 // Core services
 builder.Services.AddSingleton<IBackupJobRepository, InMemoryBackupJobRepository>();
 builder.Services.AddSingleton<IBackupHealthCheckRepository, InMemoryBackupHealthCheckRepository>();
+builder.Services.AddSingleton<IStorageHealthCheckRepository, InMemoryStorageHealthCheckRepository>();
 builder.Services.AddSingleton<IScheduleTracker, InMemoryScheduleTracker>();
+
+// Storage monitoring dependencies
+builder.Services.AddSingleton<IStorageInfoProvider, Deadpool.Infrastructure.Storage.FileSystemStorageInfoProvider>();
+builder.Services.AddSingleton<IBackupSizeEstimator, Deadpool.Infrastructure.Estimation.RecentBackupSizeEstimator>();
 
 // Backup execution dependencies (using stubs for now)
 builder.Services.AddSingleton<IBackupExecutor, StubBackupExecutor>();
@@ -51,6 +60,23 @@ builder.Services.AddSingleton<IBackupHealthMonitoringService>(sp =>
     );
 
     return new BackupHealthMonitoringService(repository, backupHealthOptions);
+});
+
+// Storage monitoring service
+builder.Services.AddSingleton<IStorageMonitoringService>(sp =>
+{
+    var storageOptions = sp.GetRequiredService<IOptions<StorageMonitoringOptions>>().Value;
+    var storageInfoProvider = sp.GetRequiredService<IStorageInfoProvider>();
+    var backupSizeEstimator = sp.GetRequiredService<IBackupSizeEstimator>();
+
+    var storageHealthOptions = new StorageHealthOptions(
+        warningThresholdPercentage: storageOptions.WarningThresholdPercentage,
+        criticalThresholdPercentage: storageOptions.CriticalThresholdPercentage,
+        minimumWarningFreeSpaceBytes: storageOptions.MinimumWarningFreeSpaceGB * 1024L * 1024 * 1024,
+        minimumCriticalFreeSpaceBytes: storageOptions.MinimumCriticalFreeSpaceGB * 1024L * 1024 * 1024
+    );
+
+    return new StorageMonitoringService(storageInfoProvider, storageHealthOptions, backupSizeEstimator);
 });
 
 // Backup file copy service (conditional registration based on configuration)
@@ -81,6 +107,7 @@ builder.Services.AddSingleton<BackupService>();
 builder.Services.AddHostedService<BackupSchedulerWorker>();
 builder.Services.AddHostedService<BackupExecutionWorker>();
 builder.Services.AddHostedService<BackupHealthMonitoringWorker>();
+builder.Services.AddHostedService<StorageMonitoringWorker>();
 
 var host = builder.Build();
 host.Run();
