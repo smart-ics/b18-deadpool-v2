@@ -34,14 +34,18 @@ builder.Services.Configure<StorageMonitoringOptions>(
     builder.Configuration.GetSection("StorageMonitoring"));
 
 // SQLite shared repository (used by Agent and UI)
-var sqlitePath = builder.Configuration.GetValue<string>("Deadpool:SqliteDatabasePath") ?? "deadpool.db";
-var fullSqlitePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, sqlitePath);
+var sqlitePath = builder.Configuration.GetValue<string>("DeadpoolDb:Path");
+if (string.IsNullOrWhiteSpace(sqlitePath))
+{
+    throw new InvalidOperationException("DeadpoolDb:Path is required for shared SQLite database.");
+}
+
 var productionConnectionString = builder.Configuration.GetConnectionString("ProductionDatabase");
 
 builder.Services.AddSingleton<IBackupJobRepository>(sp =>
 {
     var logger = sp.GetRequiredService<ILogger<SqliteBackupJobRepository>>();
-    return new SqliteBackupJobRepository(fullSqlitePath, logger);
+    return new SqliteBackupJobRepository(sqlitePath, logger);
 });
 
 // Other repositories (still in-memory for now)

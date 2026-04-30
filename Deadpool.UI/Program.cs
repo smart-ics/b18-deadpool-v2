@@ -63,7 +63,7 @@ static class Program
     {
         // Configuration options
         services.Configure<DashboardOptions>(configuration.GetSection("Dashboard"));
-        services.Configure<DeadpoolOptions>(configuration.GetSection("Deadpool"));
+        services.Configure<DeadpoolDbOptions>(configuration.GetSection("DeadpoolDb"));
 
         // Logging (simple debug logging for UI)
         services.AddLogging(builder =>
@@ -73,8 +73,13 @@ static class Program
         });
 
         // SQLite shared repository
-        var deadpoolOptions = configuration.GetSection("Deadpool").Get<DeadpoolOptions>() ?? new DeadpoolOptions();
-        var sqlitePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, deadpoolOptions.SqliteDatabasePath);
+        var deadpoolDbOptions = configuration.GetSection("DeadpoolDb").Get<DeadpoolDbOptions>() ?? new DeadpoolDbOptions();
+        if (string.IsNullOrWhiteSpace(deadpoolDbOptions.Path))
+        {
+            throw new InvalidOperationException("DeadpoolDb:Path is required for shared SQLite database.");
+        }
+
+        var sqlitePath = deadpoolDbOptions.Path;
 
         services.AddSingleton<IBackupJobRepository>(sp =>
         {

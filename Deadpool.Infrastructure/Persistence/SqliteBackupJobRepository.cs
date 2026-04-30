@@ -292,50 +292,26 @@ public class SqliteBackupJobRepository : IBackupJobRepository
 
     private BackupJob MapToBackupJob(BackupJobRow row)
     {
-        var job = new BackupJob(
+        var backupType = (BackupType)row.BackupType;
+        var status = (BackupStatus)row.Status;
+        var startTime = DateTime.Parse(row.StartTime, null, System.Globalization.DateTimeStyles.RoundtripKind);
+        var endTime = string.IsNullOrWhiteSpace(row.EndTime)
+            ? (DateTime?)null
+            : DateTime.Parse(row.EndTime, null, System.Globalization.DateTimeStyles.RoundtripKind);
+
+        return BackupJob.Restore(
             row.DatabaseName,
-            (BackupType)row.BackupType,
-            row.BackupFilePath);
-
-        // Use reflection to set readonly StartTime
-        typeof(BackupJob).GetProperty(nameof(BackupJob.StartTime))!
-            .SetValue(job, DateTime.Parse(row.StartTime));
-
-        // Set status
-        var statusField = typeof(BackupJob).GetProperty("Status", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)!;
-        statusField.SetValue(job, (BackupStatus)row.Status);
-
-        // Set EndTime if available
-        if (!string.IsNullOrEmpty(row.EndTime))
-        {
-            typeof(BackupJob).GetProperty(nameof(BackupJob.EndTime))!
-                .SetValue(job, DateTime.Parse(row.EndTime));
-        }
-
-        // Set FileSizeBytes if available
-        if (row.FileSizeBytes.HasValue)
-        {
-            typeof(BackupJob).GetProperty(nameof(BackupJob.FileSizeBytes))!
-                .SetValue(job, row.FileSizeBytes);
-        }
-
-        // Set ErrorMessage if available
-        if (!string.IsNullOrEmpty(row.ErrorMessage))
-        {
-            typeof(BackupJob).GetProperty(nameof(BackupJob.ErrorMessage))!
-                .SetValue(job, row.ErrorMessage);
-        }
-
-        // Set LSN metadata if available
-        if (row.FirstLSN.HasValue || row.LastLSN.HasValue || row.DatabaseBackupLSN.HasValue || row.CheckpointLSN.HasValue)
-        {
-            typeof(BackupJob).GetProperty(nameof(BackupJob.FirstLSN))!.SetValue(job, row.FirstLSN);
-            typeof(BackupJob).GetProperty(nameof(BackupJob.LastLSN))!.SetValue(job, row.LastLSN);
-            typeof(BackupJob).GetProperty(nameof(BackupJob.DatabaseBackupLSN))!.SetValue(job, row.DatabaseBackupLSN);
-            typeof(BackupJob).GetProperty(nameof(BackupJob.CheckpointLSN))!.SetValue(job, row.CheckpointLSN);
-        }
-
-        return job;
+            backupType,
+            status,
+            startTime,
+            endTime,
+            row.BackupFilePath,
+            row.FileSizeBytes,
+            row.ErrorMessage,
+            row.FirstLSN,
+            row.LastLSN,
+            row.DatabaseBackupLSN,
+            row.CheckpointLSN);
     }
 
     private class BackupJobRow

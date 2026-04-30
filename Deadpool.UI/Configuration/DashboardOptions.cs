@@ -8,9 +8,9 @@ public class DashboardOptions
     public int AutoRefreshIntervalSeconds { get; set; } = 60;
 }
 
-public class DeadpoolOptions
+public class DeadpoolDbOptions
 {
-    public string SqliteDatabasePath { get; set; } = "deadpool.db";
+    public string Path { get; set; } = string.Empty;
 }
 
 public class DatabaseBackupPolicyOptions

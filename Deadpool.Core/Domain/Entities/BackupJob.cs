@@ -38,6 +38,69 @@ public class BackupJob
         StartTime = DateTime.UtcNow;
     }
 
+    private BackupJob(
+        string databaseName,
+        BackupType backupType,
+        BackupStatus status,
+        DateTime startTime,
+        DateTime? endTime,
+        string backupFilePath,
+        long? fileSizeBytes,
+        string? errorMessage,
+        decimal? firstLsn,
+        decimal? lastLsn,
+        decimal? databaseBackupLsn,
+        decimal? checkpointLsn)
+    {
+        if (string.IsNullOrWhiteSpace(databaseName))
+            throw new ArgumentException("Database name cannot be empty.", nameof(databaseName));
+
+        if (string.IsNullOrWhiteSpace(backupFilePath))
+            throw new ArgumentException("Backup file path cannot be empty.", nameof(backupFilePath));
+
+        DatabaseName = databaseName;
+        BackupType = backupType;
+        Status = status;
+        StartTime = startTime;
+        EndTime = endTime;
+        BackupFilePath = backupFilePath;
+        FileSizeBytes = fileSizeBytes;
+        ErrorMessage = errorMessage;
+        FirstLSN = firstLsn;
+        LastLSN = lastLsn;
+        DatabaseBackupLSN = databaseBackupLsn;
+        CheckpointLSN = checkpointLsn;
+    }
+
+    public static BackupJob Restore(
+        string databaseName,
+        BackupType backupType,
+        BackupStatus status,
+        DateTime startTime,
+        DateTime? endTime,
+        string backupFilePath,
+        long? fileSizeBytes,
+        string? errorMessage,
+        decimal? firstLsn,
+        decimal? lastLsn,
+        decimal? databaseBackupLsn,
+        decimal? checkpointLsn)
+    {
+        return new BackupJob(
+            databaseName,
+            backupType,
+            status,
+            startTime,
+            endTime,
+            backupFilePath,
+            fileSizeBytes,
+            errorMessage,
+            firstLsn,
+            lastLsn,
+            databaseBackupLsn,
+            checkpointLsn);
+    }
+
     public void MarkAsRunning()
     {
         if (Status != BackupStatus.Pending)
