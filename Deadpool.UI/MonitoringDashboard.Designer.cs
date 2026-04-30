@@ -59,12 +59,23 @@ namespace Deadpool.UI
             this.lblPolicyRecoveryModel = new System.Windows.Forms.Label();
             this.lblPolicyRetention = new System.Windows.Forms.Label();
             this.lblPolicyBootstrap = new System.Windows.Forms.Label();
+            this.panelDatabaseTopology = new System.Windows.Forms.Panel();
+            this.lblDatabaseTopologyTitle = new System.Windows.Forms.Label();
+            this.lblDbName = new System.Windows.Forms.Label();
+            this.lblDbServer = new System.Windows.Forms.Label();
+            this.lblDbRecoveryModel = new System.Windows.Forms.Label();
+            this.lblTopologyProdServer = new System.Windows.Forms.Label();
+            this.lblTopologyBackupServer = new System.Windows.Forms.Label();
+            this.lblTopologyDestinationPath = new System.Windows.Forms.Label();
+            this.lblPulseStatus = new System.Windows.Forms.Label();
+            this.lblPulseLastChecked = new System.Windows.Forms.Label();
             this.panelHeader.SuspendLayout();
             this.panelLastBackupStatus.SuspendLayout();
             this.panelRecentJobs.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.dgvRecentJobs)).BeginInit();
             this.panelStorageStatus.SuspendLayout();
             this.panelBackupPolicy.SuspendLayout();
+            this.panelDatabaseTopology.SuspendLayout();
             this.SuspendLayout();
             // 
             // panelHeader
@@ -246,7 +257,7 @@ namespace Deadpool.UI
             this.panelStorageStatus.Controls.Add(this.lblStorageSpace);
             this.panelStorageStatus.Controls.Add(this.lblStorageHealth);
             this.panelStorageStatus.Controls.Add(this.progressBarStorage);
-            this.panelStorageStatus.Location = new System.Drawing.Point(12, 520);
+            this.panelStorageStatus.Location = new System.Drawing.Point(12, 716);
             this.panelStorageStatus.Name = "panelStorageStatus";
             this.panelStorageStatus.Size = new System.Drawing.Size(380, 148);
             this.panelStorageStatus.TabIndex = 3;
@@ -371,17 +382,118 @@ namespace Deadpool.UI
             this.lblPolicyBootstrap.Size = new System.Drawing.Size(0, 15);
             this.lblPolicyBootstrap.TabIndex = 6;
             // 
+            // panelDatabaseTopology
+            // 
+            this.panelDatabaseTopology.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+            this.panelDatabaseTopology.Controls.Add(this.lblDatabaseTopologyTitle);
+            this.panelDatabaseTopology.Controls.Add(this.lblDbName);
+            this.panelDatabaseTopology.Controls.Add(this.lblDbServer);
+            this.panelDatabaseTopology.Controls.Add(this.lblDbRecoveryModel);
+            this.panelDatabaseTopology.Controls.Add(this.lblTopologyProdServer);
+            this.panelDatabaseTopology.Controls.Add(this.lblTopologyBackupServer);
+            this.panelDatabaseTopology.Controls.Add(this.lblTopologyDestinationPath);
+            this.panelDatabaseTopology.Controls.Add(this.lblPulseStatus);
+            this.panelDatabaseTopology.Controls.Add(this.lblPulseLastChecked);
+            this.panelDatabaseTopology.Location = new System.Drawing.Point(12, 520);
+            this.panelDatabaseTopology.Name = "panelDatabaseTopology";
+            this.panelDatabaseTopology.Size = new System.Drawing.Size(380, 190);
+            this.panelDatabaseTopology.TabIndex = 5;
+            // 
+            // lblDatabaseTopologyTitle
+            // 
+            this.lblDatabaseTopologyTitle.AutoSize = true;
+            this.lblDatabaseTopologyTitle.Font = new System.Drawing.Font("Segoe UI", 11F, System.Drawing.FontStyle.Bold);
+            this.lblDatabaseTopologyTitle.Location = new System.Drawing.Point(10, 10);
+            this.lblDatabaseTopologyTitle.Name = "lblDatabaseTopologyTitle";
+            this.lblDatabaseTopologyTitle.Size = new System.Drawing.Size(129, 20);
+            this.lblDatabaseTopologyTitle.TabIndex = 0;
+            this.lblDatabaseTopologyTitle.Text = "Database Topology";
+            // 
+            // lblDbName
+            // 
+            this.lblDbName.AutoSize = true;
+            this.lblDbName.Location = new System.Drawing.Point(10, 36);
+            this.lblDbName.Name = "lblDbName";
+            this.lblDbName.Size = new System.Drawing.Size(78, 15);
+            this.lblDbName.TabIndex = 1;
+            this.lblDbName.Text = "Database: --";
+            // 
+            // lblDbServer
+            // 
+            this.lblDbServer.AutoSize = true;
+            this.lblDbServer.Location = new System.Drawing.Point(10, 54);
+            this.lblDbServer.Name = "lblDbServer";
+            this.lblDbServer.Size = new System.Drawing.Size(151, 15);
+            this.lblDbServer.TabIndex = 2;
+            this.lblDbServer.Text = "Production SQL Server: --";
+            // 
+            // lblDbRecoveryModel
+            // 
+            this.lblDbRecoveryModel.AutoSize = true;
+            this.lblDbRecoveryModel.Location = new System.Drawing.Point(10, 72);
+            this.lblDbRecoveryModel.Name = "lblDbRecoveryModel";
+            this.lblDbRecoveryModel.Size = new System.Drawing.Size(117, 15);
+            this.lblDbRecoveryModel.TabIndex = 3;
+            this.lblDbRecoveryModel.Text = "Recovery Model: --";
+            // 
+            // lblTopologyProdServer
+            // 
+            this.lblTopologyProdServer.AutoSize = true;
+            this.lblTopologyProdServer.Location = new System.Drawing.Point(10, 96);
+            this.lblTopologyProdServer.Name = "lblTopologyProdServer";
+            this.lblTopologyProdServer.Size = new System.Drawing.Size(143, 15);
+            this.lblTopologyProdServer.TabIndex = 4;
+            this.lblTopologyProdServer.Text = "Production DB Server: --";
+            // 
+            // lblTopologyBackupServer
+            // 
+            this.lblTopologyBackupServer.AutoSize = true;
+            this.lblTopologyBackupServer.Location = new System.Drawing.Point(10, 114);
+            this.lblTopologyBackupServer.Name = "lblTopologyBackupServer";
+            this.lblTopologyBackupServer.Size = new System.Drawing.Size(145, 15);
+            this.lblTopologyBackupServer.TabIndex = 5;
+            this.lblTopologyBackupServer.Text = "Backup Storage Server: --";
+            // 
+            // lblTopologyDestinationPath
+            // 
+            this.lblTopologyDestinationPath.AutoSize = true;
+            this.lblTopologyDestinationPath.Location = new System.Drawing.Point(10, 132);
+            this.lblTopologyDestinationPath.Name = "lblTopologyDestinationPath";
+            this.lblTopologyDestinationPath.Size = new System.Drawing.Size(131, 15);
+            this.lblTopologyDestinationPath.TabIndex = 6;
+            this.lblTopologyDestinationPath.Text = "Backup Destination: --";
+            // 
+            // lblPulseStatus
+            // 
+            this.lblPulseStatus.AutoSize = true;
+            this.lblPulseStatus.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold);
+            this.lblPulseStatus.Location = new System.Drawing.Point(10, 151);
+            this.lblPulseStatus.Name = "lblPulseStatus";
+            this.lblPulseStatus.Size = new System.Drawing.Size(107, 19);
+            this.lblPulseStatus.TabIndex = 7;
+            this.lblPulseStatus.Text = "Status: Unknown";
+            // 
+            // lblPulseLastChecked
+            // 
+            this.lblPulseLastChecked.AutoSize = true;
+            this.lblPulseLastChecked.Location = new System.Drawing.Point(10, 170);
+            this.lblPulseLastChecked.Name = "lblPulseLastChecked";
+            this.lblPulseLastChecked.Size = new System.Drawing.Size(95, 15);
+            this.lblPulseLastChecked.TabIndex = 8;
+            this.lblPulseLastChecked.Text = "Last Checked: --";
+            // 
             // MonitoringDashboard
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(1200, 680);
+            this.ClientSize = new System.Drawing.Size(1200, 880);
+            this.Controls.Add(this.panelDatabaseTopology);
             this.Controls.Add(this.panelBackupPolicy);
             this.Controls.Add(this.panelStorageStatus);
             this.Controls.Add(this.panelRecentJobs);
             this.Controls.Add(this.panelLastBackupStatus);
             this.Controls.Add(this.panelHeader);
-            this.MinimumSize = new System.Drawing.Size(1000, 680);
+            this.MinimumSize = new System.Drawing.Size(1000, 880);
             this.Name = "MonitoringDashboard";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.Text = "Deadpool - Backup Monitoring Dashboard";
@@ -397,6 +509,8 @@ namespace Deadpool.UI
             this.panelStorageStatus.PerformLayout();
             this.panelBackupPolicy.ResumeLayout(false);
             this.panelBackupPolicy.PerformLayout();
+            this.panelDatabaseTopology.ResumeLayout(false);
+            this.panelDatabaseTopology.PerformLayout();
             this.ResumeLayout(false);
 
         }
@@ -432,5 +546,15 @@ namespace Deadpool.UI
         private System.Windows.Forms.Label lblPolicyRecoveryModel;
         private System.Windows.Forms.Label lblPolicyRetention;
         private System.Windows.Forms.Label lblPolicyBootstrap;
+        private System.Windows.Forms.Panel panelDatabaseTopology;
+        private System.Windows.Forms.Label lblDatabaseTopologyTitle;
+        private System.Windows.Forms.Label lblDbName;
+        private System.Windows.Forms.Label lblDbServer;
+        private System.Windows.Forms.Label lblDbRecoveryModel;
+        private System.Windows.Forms.Label lblTopologyProdServer;
+        private System.Windows.Forms.Label lblTopologyBackupServer;
+        private System.Windows.Forms.Label lblTopologyDestinationPath;
+        private System.Windows.Forms.Label lblPulseStatus;
+        private System.Windows.Forms.Label lblPulseLastChecked;
     }
 }

@@ -2,6 +2,7 @@ using Deadpool.Core.Domain.Enums;
 using Deadpool.Core.Domain.ValueObjects;
 using Deadpool.Core.Interfaces;
 using Deadpool.UI.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace Deadpool.UI;
 
@@ -13,7 +14,10 @@ public partial class MonitoringDashboard : Form
 {
     private readonly IDashboardMonitoringService _dashboardService;
     private readonly IBackupPolicyDisplayFormatter _policyDisplayFormatter;
+    private readonly IDatabasePulseService _databasePulseService;
+    private readonly ILogger<MonitoringDashboard> _logger;
     private readonly string _databaseName;
+    private readonly string _databaseServerAddress;
     private readonly string _backupVolumePath;
     private readonly DatabaseBackupPolicyOptions? _backupPolicy;
     private readonly System.Windows.Forms.Timer? _autoRefreshTimer;
@@ -22,19 +26,26 @@ public partial class MonitoringDashboard : Form
     public MonitoringDashboard(
         IDashboardMonitoringService dashboardService,
         IBackupPolicyDisplayFormatter policyDisplayFormatter,
+        IDatabasePulseService databasePulseService,
+        ILogger<MonitoringDashboard> logger,
         string databaseName,
+        string databaseServerAddress,
         string backupVolumePath,
         int autoRefreshIntervalSeconds = 60,
         DatabaseBackupPolicyOptions? backupPolicy = null)
     {
         _dashboardService = dashboardService ?? throw new ArgumentNullException(nameof(dashboardService));
         _policyDisplayFormatter = policyDisplayFormatter ?? throw new ArgumentNullException(nameof(policyDisplayFormatter));
+        _databasePulseService = databasePulseService ?? throw new ArgumentNullException(nameof(databasePulseService));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _databaseName = databaseName ?? throw new ArgumentNullException(nameof(databaseName));
+        _databaseServerAddress = databaseServerAddress ?? throw new ArgumentNullException(nameof(databaseServerAddress));
         _backupVolumePath = backupVolumePath ?? throw new ArgumentNullException(nameof(backupVolumePath));
         _backupPolicy = backupPolicy;
 
         InitializeComponent();
         DisplayBackupPolicySummary();
+        DisplayDatabaseTopology();
 
         // Setup auto-refresh timer if enabled
         if (autoRefreshIntervalSeconds > 0)
@@ -91,6 +102,7 @@ public partial class MonitoringDashboard : Form
             DisplayLastBackupStatus(snapshot.LastBackupStatus);
             DisplayRecentJobs(snapshot.RecentJobs);
             DisplayStorageStatus(snapshot.StorageStatus);
+            await DisplayDatabasePulseAsync();
 
             _lastUpdateTime = snapshot.SnapshotTime;
             lblLastRefresh.Text = $"Last refresh: {snapshot.SnapshotTime:yyyy-MM-dd HH:mm:ss} UTC";
@@ -134,6 +146,10 @@ public partial class MonitoringDashboard : Form
         lblStorageHealth.ForeColor = Color.Gray;
         progressBarStorage.Value = 0;
         panelStorageStatus.BackColor = Color.White;
+
+        lblPulseStatus.Text = "Status: Unknown";
+        lblPulseStatus.ForeColor = Color.Gray;
+        lblPulseLastChecked.Text = "Last Checked: --";
     }
 
     private void DisplayBackupPolicySummary()
@@ -308,5 +324,45 @@ public partial class MonitoringDashboard : Form
             HealthStatus.Critical => Color.FromArgb(255, 230, 230), // Light red
             _ => Color.White
         };
+    }
+
+    private void DisplayDatabaseTopology()
+    {
+        lblDbName.Text = $"Database: {_databaseName}";
+        lblDbServer.Text = $"Production SQL Server: {_databaseServerAddress}";
+        lblDbRecoveryModel.Text = $"Recovery Model: {(_backupPolicy?.RecoveryModel ?? "Unknown")}";
+
+        var backupServer = ResolveBackupStorageServer(_backupVolumePath);
+        lblTopologyProdServer.Text = $"Production DB Server: {_databaseServerAddress}";
+        lblTopologyBackupServer.Text = $"Backup Storage Server: {backupServer}";
+        lblTopologyDestinationPath.Text = $"Backup Destination: {_backupVolumePath}";
+    }
+
+    private async Task DisplayDatabasePulseAsync()
+    {
+        var result = await _databasePulseService.CheckAsync();
+        lblPulseStatus.Text = $"Status: {result.Status}";
+        lblPulseStatus.ForeColor = GetHealthColor(result.Status);
+        lblPulseLastChecked.Text = $"Last Checked: {result.LastCheckedUtc:yyyy-MM-dd HH:mm:ss} UTC";
+
+        if (result.Status == HealthStatus.Critical && !string.IsNullOrWhiteSpace(result.ErrorMessage))
+        {
+            _logger.LogError("Database connectivity critical. Error: {ErrorMessage}", result.ErrorMessage);
+        }
+    }
+
+    private static string ResolveBackupStorageServer(string destinationPath)
+    {
+        if (string.IsNullOrWhiteSpace(destinationPath))
+            return "Unknown";
+
+        if (destinationPath.StartsWith("\\\\", StringComparison.Ordinal))
+        {
+            var parts = destinationPath.Trim('\\').Split('\\', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length > 0)
+                return parts[0];
+        }
+
+        return "Local or direct-attached storage";
     }
 }

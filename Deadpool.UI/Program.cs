@@ -1,11 +1,13 @@
 using Deadpool.Core.Interfaces;
 using Deadpool.Core.Services;
+using Deadpool.Infrastructure.Metadata;
 using Deadpool.Infrastructure.Persistence;
 using Deadpool.Infrastructure.Storage;
 using Deadpool.UI.Configuration;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Data.SqlClient;
 
 namespace Deadpool.UI;
 
@@ -43,7 +45,10 @@ static class Program
         var dashboard = new MonitoringDashboard(
             dashboardService,
             policyFormatter,
+            serviceProvider.GetRequiredService<IDatabasePulseService>(),
+            serviceProvider.GetRequiredService<ILogger<MonitoringDashboard>>(),
             dashboardOptions.DatabaseName,
+            GetServerAddress(dashboardOptions.DatabaseConnectionString),
             dashboardOptions.BackupVolumePath,
             dashboardOptions.AutoRefreshIntervalSeconds,
             selectedPolicy);
@@ -101,11 +106,34 @@ static class Program
         services.AddSingleton<IBackupJobMonitoringService, BackupJobMonitoringService>();
         services.AddSingleton<ICronScheduleDescriptionService, CronScheduleDescriptionService>();
         services.AddSingleton<IBackupPolicyDisplayFormatter, BackupPolicyDisplayFormatter>();
+        services.AddSingleton<IDatabasePulseService, DatabasePulseService>();
+        services.AddSingleton<IDatabaseConnectivityProbe>(_ =>
+        {
+            var connectionString = configuration.GetValue<string>("Dashboard:DatabaseConnectionString") ?? string.Empty;
+            var databaseName = configuration.GetValue<string>("Dashboard:DatabaseName") ?? string.Empty;
+            return new SqlServerDatabaseConnectivityProbe(connectionString, databaseName);
+        });
 
         // Other repositories (still in-memory for now)
         services.AddSingleton<IStorageHealthCheckRepository, InMemoryStorageHealthCheckRepository>();
 
         // Storage abstraction
         services.AddSingleton<IStorageInfoProvider, FileSystemStorageInfoProvider>();
+    }
+
+    private static string GetServerAddress(string connectionString)
+    {
+        if (string.IsNullOrWhiteSpace(connectionString))
+            return "Unknown";
+
+        try
+        {
+            var builder = new SqlConnectionStringBuilder(connectionString);
+            return string.IsNullOrWhiteSpace(builder.DataSource) ? "Unknown" : builder.DataSource;
+        }
+        catch
+        {
+            return "Unknown";
+        }
     }
 }
