@@ -2,6 +2,7 @@ using Deadpool.Core.Domain.Entities;
 using Deadpool.Core.Domain.Enums;
 using Deadpool.Core.Domain.ValueObjects;
 using Deadpool.Core.Interfaces;
+using Microsoft.Extensions.Logging;
 
 namespace Deadpool.Core.Services;
 
@@ -12,27 +13,66 @@ public class DashboardMonitoringService : IDashboardMonitoringService
 {
     private readonly IBackupJobRepository _backupJobRepository;
     private readonly IStorageMonitoringService _storageMonitoringService;
+    private readonly ILogger<DashboardMonitoringService> _logger;
     private const int RecentJobCount = 20;
 
     public DashboardMonitoringService(
         IBackupJobRepository backupJobRepository,
-        IStorageMonitoringService storageMonitoringService)
+        IStorageMonitoringService storageMonitoringService,
+        ILogger<DashboardMonitoringService> logger)
     {
         _backupJobRepository = backupJobRepository ?? throw new ArgumentNullException(nameof(backupJobRepository));
         _storageMonitoringService = storageMonitoringService ?? throw new ArgumentNullException(nameof(storageMonitoringService));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     public async Task<DashboardSnapshot> GetDashboardSnapshotAsync(string databaseName, string backupVolumePath)
     {
         var lastBackupStatus = await BuildLastBackupStatusAsync(databaseName);
+        var chainInitializationStatus = await BuildChainInitializationStatusAsync(databaseName);
         var recentJobs = await BuildRecentJobsAsync(databaseName);
         var storageStatus = await BuildStorageStatusAsync(backupVolumePath);
 
         return new DashboardSnapshot(
             databaseName,
             lastBackupStatus,
+            chainInitializationStatus,
             recentJobs,
             storageStatus);
+    }
+
+    private async Task<ChainInitializationStatusSummary> BuildChainInitializationStatusAsync(string databaseName)
+    {
+        try
+        {
+            var lastSuccessfulFull = await _backupJobRepository.GetLastSuccessfulFullBackupAsync(databaseName);
+            var isInitialized = lastSuccessfulFull != null;
+
+            var restoreChainHealth = isInitialized ? "Healthy" : "Unhealthy";
+
+            return new ChainInitializationStatusSummary
+            {
+                IsInitialized = isInitialized,
+                LastValidFullBackupTime = lastSuccessfulFull?.EndTime,
+                LastValidFullBackupPath = lastSuccessfulFull?.BackupFilePath,
+                RestoreChainHealth = restoreChainHealth,
+                WarningMessage = isInitialized
+                    ? string.Empty
+                    : "System not yet protected — Full backup has not been completed"
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to build chain initialization status for database '{DatabaseName}'.", databaseName);
+            return new ChainInitializationStatusSummary
+            {
+                IsInitialized = null,
+                LastValidFullBackupTime = null,
+                LastValidFullBackupPath = null,
+                RestoreChainHealth = "Unknown",
+                WarningMessage = "Backup status unknown — verify system"
+            };
+        }
     }
 
     private async Task<LastBackupStatus> BuildLastBackupStatusAsync(string databaseName)

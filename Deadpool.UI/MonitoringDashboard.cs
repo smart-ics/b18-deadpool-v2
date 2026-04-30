@@ -102,6 +102,7 @@ public partial class MonitoringDashboard : Form
             DisplayLastBackupStatus(snapshot.LastBackupStatus);
             DisplayRecentJobs(snapshot.RecentJobs);
             DisplayStorageStatus(snapshot.StorageStatus);
+            DisplayChainInitializationStatus(snapshot.ChainInitializationStatus);
             await DisplayDatabasePulseAsync();
 
             _lastUpdateTime = snapshot.SnapshotTime;
@@ -150,6 +151,10 @@ public partial class MonitoringDashboard : Form
         lblPulseStatus.Text = "Status: Unknown";
         lblPulseStatus.ForeColor = Color.Gray;
         lblPulseLastChecked.Text = "Last Checked: --";
+        lblChainInitialized.Text = "Backup Chain Initialized: Unknown";
+        lblLastValidFullBackup.Text = "Last Valid Full Backup: Not available";
+        lblRestoreChainHealthSimple.Text = "Restore Chain Health: Unknown";
+        lblChainInitializationWarning.Text = string.Empty;
     }
 
     private void DisplayBackupPolicySummary()
@@ -349,6 +354,38 @@ public partial class MonitoringDashboard : Form
         {
             _logger.LogError("Database connectivity critical. Error: {ErrorMessage}", result.ErrorMessage);
         }
+    }
+
+    private void DisplayChainInitializationStatus(ChainInitializationStatusSummary status)
+    {
+        var initializedText = status.IsInitialized.HasValue
+            ? (status.IsInitialized.Value ? "Yes" : "No")
+            : "Unknown";
+        lblChainInitialized.Text = $"Backup Chain Initialized: {initializedText}";
+
+        if (status.LastValidFullBackupTime.HasValue)
+        {
+            var timestamp = status.LastValidFullBackupTime.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
+            var path = string.IsNullOrWhiteSpace(status.LastValidFullBackupPath)
+                ? string.Empty
+                : $" ({status.LastValidFullBackupPath})";
+            lblLastValidFullBackup.Text = $"Last Valid Full Backup: {timestamp}{path}";
+        }
+        else
+        {
+            lblLastValidFullBackup.Text = "Last Valid Full Backup: Not available";
+        }
+
+        lblRestoreChainHealthSimple.Text = $"Restore Chain Health: {status.RestoreChainHealth}";
+        lblRestoreChainHealthSimple.ForeColor = status.RestoreChainHealth switch
+        {
+            "Healthy" => Color.Green,
+            "Unhealthy" => Color.Red,
+            _ => Color.Gray
+        };
+
+        lblChainInitializationWarning.Text = status.WarningMessage;
+        lblChainInitializationWarning.ForeColor = string.IsNullOrWhiteSpace(status.WarningMessage) ? Color.Gray : Color.Red;
     }
 
     private static string ResolveBackupStorageServer(string destinationPath)

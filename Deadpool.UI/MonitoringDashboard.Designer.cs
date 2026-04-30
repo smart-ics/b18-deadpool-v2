@@ -69,6 +69,10 @@ namespace Deadpool.UI
             this.lblTopologyDestinationPath = new System.Windows.Forms.Label();
             this.lblPulseStatus = new System.Windows.Forms.Label();
             this.lblPulseLastChecked = new System.Windows.Forms.Label();
+            this.lblChainInitialized = new System.Windows.Forms.Label();
+            this.lblLastValidFullBackup = new System.Windows.Forms.Label();
+            this.lblRestoreChainHealthSimple = new System.Windows.Forms.Label();
+            this.lblChainInitializationWarning = new System.Windows.Forms.Label();
             this.panelHeader.SuspendLayout();
             this.panelLastBackupStatus.SuspendLayout();
             this.panelRecentJobs.SuspendLayout();
@@ -257,7 +261,7 @@ namespace Deadpool.UI
             this.panelStorageStatus.Controls.Add(this.lblStorageSpace);
             this.panelStorageStatus.Controls.Add(this.lblStorageHealth);
             this.panelStorageStatus.Controls.Add(this.progressBarStorage);
-            this.panelStorageStatus.Location = new System.Drawing.Point(12, 716);
+            this.panelStorageStatus.Location = new System.Drawing.Point(12, 830);
             this.panelStorageStatus.Name = "panelStorageStatus";
             this.panelStorageStatus.Size = new System.Drawing.Size(380, 148);
             this.panelStorageStatus.TabIndex = 3;
@@ -394,9 +398,13 @@ namespace Deadpool.UI
             this.panelDatabaseTopology.Controls.Add(this.lblTopologyDestinationPath);
             this.panelDatabaseTopology.Controls.Add(this.lblPulseStatus);
             this.panelDatabaseTopology.Controls.Add(this.lblPulseLastChecked);
+            this.panelDatabaseTopology.Controls.Add(this.lblChainInitialized);
+            this.panelDatabaseTopology.Controls.Add(this.lblLastValidFullBackup);
+            this.panelDatabaseTopology.Controls.Add(this.lblRestoreChainHealthSimple);
+            this.panelDatabaseTopology.Controls.Add(this.lblChainInitializationWarning);
             this.panelDatabaseTopology.Location = new System.Drawing.Point(12, 520);
             this.panelDatabaseTopology.Name = "panelDatabaseTopology";
-            this.panelDatabaseTopology.Size = new System.Drawing.Size(380, 190);
+            this.panelDatabaseTopology.Size = new System.Drawing.Size(380, 300);
             this.panelDatabaseTopology.TabIndex = 5;
             // 
             // lblDatabaseTopologyTitle
@@ -482,18 +490,54 @@ namespace Deadpool.UI
             this.lblPulseLastChecked.TabIndex = 8;
             this.lblPulseLastChecked.Text = "Last Checked: --";
             // 
+            // lblChainInitialized
+            // 
+            this.lblChainInitialized.AutoSize = true;
+            this.lblChainInitialized.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold);
+            this.lblChainInitialized.Location = new System.Drawing.Point(10, 194);
+            this.lblChainInitialized.Name = "lblChainInitialized";
+            this.lblChainInitialized.Size = new System.Drawing.Size(199, 19);
+            this.lblChainInitialized.TabIndex = 9;
+            this.lblChainInitialized.Text = "Backup Chain Initialized: --";
+            // 
+            // lblLastValidFullBackup
+            // 
+            this.lblLastValidFullBackup.Location = new System.Drawing.Point(10, 214);
+            this.lblLastValidFullBackup.Name = "lblLastValidFullBackup";
+            this.lblLastValidFullBackup.Size = new System.Drawing.Size(358, 32);
+            this.lblLastValidFullBackup.TabIndex = 10;
+            this.lblLastValidFullBackup.Text = "Last Valid Full Backup: --";
+            // 
+            // lblRestoreChainHealthSimple
+            // 
+            this.lblRestoreChainHealthSimple.AutoSize = true;
+            this.lblRestoreChainHealthSimple.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold);
+            this.lblRestoreChainHealthSimple.Location = new System.Drawing.Point(10, 246);
+            this.lblRestoreChainHealthSimple.Name = "lblRestoreChainHealthSimple";
+            this.lblRestoreChainHealthSimple.Size = new System.Drawing.Size(167, 19);
+            this.lblRestoreChainHealthSimple.TabIndex = 11;
+            this.lblRestoreChainHealthSimple.Text = "Restore Chain Health: --";
+            // 
+            // lblChainInitializationWarning
+            // 
+            this.lblChainInitializationWarning.Location = new System.Drawing.Point(10, 268);
+            this.lblChainInitializationWarning.Name = "lblChainInitializationWarning";
+            this.lblChainInitializationWarning.Size = new System.Drawing.Size(358, 28);
+            this.lblChainInitializationWarning.TabIndex = 12;
+            this.lblChainInitializationWarning.Text = "--";
+            // 
             // MonitoringDashboard
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(1200, 880);
+            this.ClientSize = new System.Drawing.Size(1200, 1020);
             this.Controls.Add(this.panelDatabaseTopology);
             this.Controls.Add(this.panelBackupPolicy);
             this.Controls.Add(this.panelStorageStatus);
             this.Controls.Add(this.panelRecentJobs);
             this.Controls.Add(this.panelLastBackupStatus);
             this.Controls.Add(this.panelHeader);
-            this.MinimumSize = new System.Drawing.Size(1000, 880);
+            this.MinimumSize = new System.Drawing.Size(1000, 1020);
             this.Name = "MonitoringDashboard";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.Text = "Deadpool - Backup Monitoring Dashboard";
@@ -556,5 +600,9 @@ namespace Deadpool.UI
         private System.Windows.Forms.Label lblTopologyDestinationPath;
         private System.Windows.Forms.Label lblPulseStatus;
         private System.Windows.Forms.Label lblPulseLastChecked;
+        private System.Windows.Forms.Label lblChainInitialized;
+        private System.Windows.Forms.Label lblLastValidFullBackup;
+        private System.Windows.Forms.Label lblRestoreChainHealthSimple;
+        private System.Windows.Forms.Label lblChainInitializationWarning;
     }
 }

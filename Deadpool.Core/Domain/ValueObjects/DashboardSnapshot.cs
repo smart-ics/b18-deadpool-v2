@@ -11,21 +11,33 @@ public record DashboardSnapshot
     public DateTime SnapshotTime { get; init; }
     public string DatabaseName { get; init; }
     public LastBackupStatus LastBackupStatus { get; init; }
+    public ChainInitializationStatusSummary ChainInitializationStatus { get; init; }
     public List<RecentJobSummary> RecentJobs { get; init; }
     public StorageStatusSummary StorageStatus { get; init; }
 
     public DashboardSnapshot(
         string databaseName,
         LastBackupStatus lastBackupStatus,
+        ChainInitializationStatusSummary chainInitializationStatus,
         List<RecentJobSummary> recentJobs,
         StorageStatusSummary storageStatus)
     {
         SnapshotTime = DateTime.UtcNow;
         DatabaseName = databaseName;
         LastBackupStatus = lastBackupStatus;
+        ChainInitializationStatus = chainInitializationStatus;
         RecentJobs = recentJobs;
         StorageStatus = storageStatus;
     }
+}
+
+public record ChainInitializationStatusSummary
+{
+    public bool? IsInitialized { get; init; }
+    public DateTime? LastValidFullBackupTime { get; init; }
+    public string? LastValidFullBackupPath { get; init; }
+    public string RestoreChainHealth { get; init; } = "Unknown";
+    public string WarningMessage { get; init; } = string.Empty;
 }
 
 public record LastBackupStatus
