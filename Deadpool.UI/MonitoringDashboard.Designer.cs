@@ -51,11 +51,20 @@ namespace Deadpool.UI
             this.lblStorageSpace = new System.Windows.Forms.Label();
             this.lblStorageHealth = new System.Windows.Forms.Label();
             this.progressBarStorage = new System.Windows.Forms.ProgressBar();
+            this.panelBackupPolicy = new System.Windows.Forms.Panel();
+            this.lblPolicyTitle = new System.Windows.Forms.Label();
+            this.lblPolicyFullSchedule = new System.Windows.Forms.Label();
+            this.lblPolicyDifferentialSchedule = new System.Windows.Forms.Label();
+            this.lblPolicyLogSchedule = new System.Windows.Forms.Label();
+            this.lblPolicyRecoveryModel = new System.Windows.Forms.Label();
+            this.lblPolicyRetention = new System.Windows.Forms.Label();
+            this.lblPolicyBootstrap = new System.Windows.Forms.Label();
             this.panelHeader.SuspendLayout();
             this.panelLastBackupStatus.SuspendLayout();
             this.panelRecentJobs.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.dgvRecentJobs)).BeginInit();
             this.panelStorageStatus.SuspendLayout();
+            this.panelBackupPolicy.SuspendLayout();
             this.SuspendLayout();
             // 
             // panelHeader
@@ -126,7 +135,7 @@ namespace Deadpool.UI
             this.panelLastBackupStatus.Controls.Add(this.lstWarnings);
             this.panelLastBackupStatus.Location = new System.Drawing.Point(12, 70);
             this.panelLastBackupStatus.Name = "panelLastBackupStatus";
-            this.panelLastBackupStatus.Size = new System.Drawing.Size(380, 300);
+            this.panelLastBackupStatus.Size = new System.Drawing.Size(380, 250);
             this.panelLastBackupStatus.TabIndex = 1;
             // 
             // lblLastBackupTitle
@@ -198,7 +207,7 @@ namespace Deadpool.UI
             this.panelRecentJobs.Controls.Add(this.dgvRecentJobs);
             this.panelRecentJobs.Location = new System.Drawing.Point(400, 70);
             this.panelRecentJobs.Name = "panelRecentJobs";
-            this.panelRecentJobs.Size = new System.Drawing.Size(788, 520);
+            this.panelRecentJobs.Size = new System.Drawing.Size(788, 598);
             this.panelRecentJobs.TabIndex = 2;
             // 
             // lblRecentJobsTitle
@@ -225,22 +234,21 @@ namespace Deadpool.UI
             this.dgvRecentJobs.ReadOnly = true;
             this.dgvRecentJobs.RowHeadersVisible = false;
             this.dgvRecentJobs.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
-            this.dgvRecentJobs.Size = new System.Drawing.Size(768, 468);
+            this.dgvRecentJobs.Size = new System.Drawing.Size(768, 546);
             this.dgvRecentJobs.TabIndex = 1;
             // 
             // panelStorageStatus
             // 
-            this.panelStorageStatus.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
-            | System.Windows.Forms.AnchorStyles.Left)));
+            this.panelStorageStatus.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left)));
             this.panelStorageStatus.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.panelStorageStatus.Controls.Add(this.lblStorageTitle);
             this.panelStorageStatus.Controls.Add(this.lblStoragePath);
             this.panelStorageStatus.Controls.Add(this.lblStorageSpace);
             this.panelStorageStatus.Controls.Add(this.lblStorageHealth);
             this.panelStorageStatus.Controls.Add(this.progressBarStorage);
-            this.panelStorageStatus.Location = new System.Drawing.Point(12, 380);
+            this.panelStorageStatus.Location = new System.Drawing.Point(12, 520);
             this.panelStorageStatus.Name = "panelStorageStatus";
-            this.panelStorageStatus.Size = new System.Drawing.Size(380, 210);
+            this.panelStorageStatus.Size = new System.Drawing.Size(380, 148);
             this.panelStorageStatus.TabIndex = 3;
             // 
             // lblStorageTitle
@@ -265,7 +273,7 @@ namespace Deadpool.UI
             // lblStorageSpace
             // 
             this.lblStorageSpace.AutoSize = true;
-            this.lblStorageSpace.Location = new System.Drawing.Point(10, 90);
+            this.lblStorageSpace.Location = new System.Drawing.Point(10, 86);
             this.lblStorageSpace.Name = "lblStorageSpace";
             this.lblStorageSpace.Size = new System.Drawing.Size(150, 15);
             this.lblStorageSpace.TabIndex = 2;
@@ -275,7 +283,7 @@ namespace Deadpool.UI
             // 
             this.lblStorageHealth.AutoSize = true;
             this.lblStorageHealth.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold);
-            this.lblStorageHealth.Location = new System.Drawing.Point(10, 130);
+            this.lblStorageHealth.Location = new System.Drawing.Point(10, 112);
             this.lblStorageHealth.Name = "lblStorageHealth";
             this.lblStorageHealth.Size = new System.Drawing.Size(130, 19);
             this.lblStorageHealth.TabIndex = 3;
@@ -288,16 +296,92 @@ namespace Deadpool.UI
             this.progressBarStorage.Size = new System.Drawing.Size(358, 23);
             this.progressBarStorage.TabIndex = 4;
             // 
+            // panelBackupPolicy
+            // 
+            this.panelBackupPolicy.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+            this.panelBackupPolicy.Controls.Add(this.lblPolicyTitle);
+            this.panelBackupPolicy.Controls.Add(this.lblPolicyFullSchedule);
+            this.panelBackupPolicy.Controls.Add(this.lblPolicyDifferentialSchedule);
+            this.panelBackupPolicy.Controls.Add(this.lblPolicyLogSchedule);
+            this.panelBackupPolicy.Controls.Add(this.lblPolicyRecoveryModel);
+            this.panelBackupPolicy.Controls.Add(this.lblPolicyRetention);
+            this.panelBackupPolicy.Controls.Add(this.lblPolicyBootstrap);
+            this.panelBackupPolicy.Location = new System.Drawing.Point(12, 330);
+            this.panelBackupPolicy.Name = "panelBackupPolicy";
+            this.panelBackupPolicy.Size = new System.Drawing.Size(380, 180);
+            this.panelBackupPolicy.TabIndex = 4;
+            // 
+            // lblPolicyTitle
+            // 
+            this.lblPolicyTitle.AutoSize = true;
+            this.lblPolicyTitle.Font = new System.Drawing.Font("Segoe UI", 11F, System.Drawing.FontStyle.Bold);
+            this.lblPolicyTitle.Location = new System.Drawing.Point(10, 10);
+            this.lblPolicyTitle.Name = "lblPolicyTitle";
+            this.lblPolicyTitle.Size = new System.Drawing.Size(98, 20);
+            this.lblPolicyTitle.TabIndex = 0;
+            this.lblPolicyTitle.Text = "Backup Policy";
+            // 
+            // lblPolicyFullSchedule
+            // 
+            this.lblPolicyFullSchedule.Location = new System.Drawing.Point(10, 38);
+            this.lblPolicyFullSchedule.Name = "lblPolicyFullSchedule";
+            this.lblPolicyFullSchedule.Size = new System.Drawing.Size(358, 26);
+            this.lblPolicyFullSchedule.TabIndex = 1;
+            this.lblPolicyFullSchedule.Text = "Full Backup runs --";
+            // 
+            // lblPolicyDifferentialSchedule
+            // 
+            this.lblPolicyDifferentialSchedule.Location = new System.Drawing.Point(10, 62);
+            this.lblPolicyDifferentialSchedule.Name = "lblPolicyDifferentialSchedule";
+            this.lblPolicyDifferentialSchedule.Size = new System.Drawing.Size(358, 26);
+            this.lblPolicyDifferentialSchedule.TabIndex = 2;
+            this.lblPolicyDifferentialSchedule.Text = "Differential Backup runs --";
+            // 
+            // lblPolicyLogSchedule
+            // 
+            this.lblPolicyLogSchedule.Location = new System.Drawing.Point(10, 86);
+            this.lblPolicyLogSchedule.Name = "lblPolicyLogSchedule";
+            this.lblPolicyLogSchedule.Size = new System.Drawing.Size(358, 26);
+            this.lblPolicyLogSchedule.TabIndex = 3;
+            this.lblPolicyLogSchedule.Text = "Transaction Log Backup runs --";
+            // 
+            // lblPolicyRecoveryModel
+            // 
+            this.lblPolicyRecoveryModel.AutoSize = true;
+            this.lblPolicyRecoveryModel.Location = new System.Drawing.Point(10, 114);
+            this.lblPolicyRecoveryModel.Name = "lblPolicyRecoveryModel";
+            this.lblPolicyRecoveryModel.Size = new System.Drawing.Size(101, 15);
+            this.lblPolicyRecoveryModel.TabIndex = 4;
+            this.lblPolicyRecoveryModel.Text = "Recovery Model: --";
+            // 
+            // lblPolicyRetention
+            // 
+            this.lblPolicyRetention.AutoSize = true;
+            this.lblPolicyRetention.Location = new System.Drawing.Point(10, 132);
+            this.lblPolicyRetention.Name = "lblPolicyRetention";
+            this.lblPolicyRetention.Size = new System.Drawing.Size(77, 15);
+            this.lblPolicyRetention.TabIndex = 5;
+            this.lblPolicyRetention.Text = "Retention: --";
+            // 
+            // lblPolicyBootstrap
+            // 
+            this.lblPolicyBootstrap.AutoSize = true;
+            this.lblPolicyBootstrap.Location = new System.Drawing.Point(10, 150);
+            this.lblPolicyBootstrap.Name = "lblPolicyBootstrap";
+            this.lblPolicyBootstrap.Size = new System.Drawing.Size(0, 15);
+            this.lblPolicyBootstrap.TabIndex = 6;
+            // 
             // MonitoringDashboard
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(1200, 600);
+            this.ClientSize = new System.Drawing.Size(1200, 680);
+            this.Controls.Add(this.panelBackupPolicy);
             this.Controls.Add(this.panelStorageStatus);
             this.Controls.Add(this.panelRecentJobs);
             this.Controls.Add(this.panelLastBackupStatus);
             this.Controls.Add(this.panelHeader);
-            this.MinimumSize = new System.Drawing.Size(1000, 600);
+            this.MinimumSize = new System.Drawing.Size(1000, 680);
             this.Name = "MonitoringDashboard";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.Text = "Deadpool - Backup Monitoring Dashboard";
@@ -311,6 +395,8 @@ namespace Deadpool.UI
             ((System.ComponentModel.ISupportInitialize)(this.dgvRecentJobs)).EndInit();
             this.panelStorageStatus.ResumeLayout(false);
             this.panelStorageStatus.PerformLayout();
+            this.panelBackupPolicy.ResumeLayout(false);
+            this.panelBackupPolicy.PerformLayout();
             this.ResumeLayout(false);
 
         }
@@ -338,5 +424,13 @@ namespace Deadpool.UI
         private System.Windows.Forms.Label lblStorageSpace;
         private System.Windows.Forms.Label lblStorageHealth;
         private System.Windows.Forms.ProgressBar progressBarStorage;
+        private System.Windows.Forms.Panel panelBackupPolicy;
+        private System.Windows.Forms.Label lblPolicyTitle;
+        private System.Windows.Forms.Label lblPolicyFullSchedule;
+        private System.Windows.Forms.Label lblPolicyDifferentialSchedule;
+        private System.Windows.Forms.Label lblPolicyLogSchedule;
+        private System.Windows.Forms.Label lblPolicyRecoveryModel;
+        private System.Windows.Forms.Label lblPolicyRetention;
+        private System.Windows.Forms.Label lblPolicyBootstrap;
     }
 }

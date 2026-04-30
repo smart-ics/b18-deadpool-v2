@@ -1,6 +1,7 @@
 using Deadpool.Core.Domain.Enums;
 using Deadpool.Core.Domain.ValueObjects;
 using Deadpool.Core.Interfaces;
+using Deadpool.UI.Configuration;
 
 namespace Deadpool.UI;
 
@@ -11,22 +12,29 @@ namespace Deadpool.UI;
 public partial class MonitoringDashboard : Form
 {
     private readonly IDashboardMonitoringService _dashboardService;
+    private readonly IBackupPolicyDisplayFormatter _policyDisplayFormatter;
     private readonly string _databaseName;
     private readonly string _backupVolumePath;
+    private readonly DatabaseBackupPolicyOptions? _backupPolicy;
     private readonly System.Windows.Forms.Timer? _autoRefreshTimer;
     private DateTime _lastUpdateTime;
 
     public MonitoringDashboard(
         IDashboardMonitoringService dashboardService,
+        IBackupPolicyDisplayFormatter policyDisplayFormatter,
         string databaseName,
         string backupVolumePath,
-        int autoRefreshIntervalSeconds = 60)
+        int autoRefreshIntervalSeconds = 60,
+        DatabaseBackupPolicyOptions? backupPolicy = null)
     {
         _dashboardService = dashboardService ?? throw new ArgumentNullException(nameof(dashboardService));
+        _policyDisplayFormatter = policyDisplayFormatter ?? throw new ArgumentNullException(nameof(policyDisplayFormatter));
         _databaseName = databaseName ?? throw new ArgumentNullException(nameof(databaseName));
         _backupVolumePath = backupVolumePath ?? throw new ArgumentNullException(nameof(backupVolumePath));
+        _backupPolicy = backupPolicy;
 
         InitializeComponent();
+        DisplayBackupPolicySummary();
 
         // Setup auto-refresh timer if enabled
         if (autoRefreshIntervalSeconds > 0)
@@ -126,6 +134,35 @@ public partial class MonitoringDashboard : Form
         lblStorageHealth.ForeColor = Color.Gray;
         progressBarStorage.Value = 0;
         panelStorageStatus.BackColor = Color.White;
+    }
+
+    private void DisplayBackupPolicySummary()
+    {
+        if (_backupPolicy == null)
+        {
+            lblPolicyFullSchedule.Text = "Full Backup: Policy not configured";
+            lblPolicyDifferentialSchedule.Text = "Differential Backup: Policy not configured";
+            lblPolicyLogSchedule.Text = "Transaction Log Backup: Policy not configured";
+            lblPolicyRecoveryModel.Text = "Recovery Model: Unknown";
+            lblPolicyRetention.Text = "Retention: Unknown";
+            lblPolicyBootstrap.Text = string.Empty;
+            return;
+        }
+
+        var summary = _policyDisplayFormatter.Format(
+            _backupPolicy.FullBackupCron,
+            _backupPolicy.DifferentialBackupCron,
+            _backupPolicy.TransactionLogBackupCron,
+            _backupPolicy.RecoveryModel,
+            _backupPolicy.RetentionDays,
+            _backupPolicy.BootstrapFullBackupEnabled);
+
+        lblPolicyFullSchedule.Text = summary.FullBackupSchedule;
+        lblPolicyDifferentialSchedule.Text = summary.DifferentialBackupSchedule;
+        lblPolicyLogSchedule.Text = summary.TransactionLogBackupSchedule;
+        lblPolicyRecoveryModel.Text = summary.RecoveryModel;
+        lblPolicyRetention.Text = summary.Retention;
+        lblPolicyBootstrap.Text = summary.BootstrapFullBackupEnabled ?? string.Empty;
     }
 
     private void DisplayLastBackupStatus(LastBackupStatus status)

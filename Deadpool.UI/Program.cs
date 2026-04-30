@@ -32,14 +32,21 @@ static class Program
 
         // Load dashboard settings
         var dashboardOptions = configuration.GetSection("Dashboard").Get<DashboardOptions>() ?? new DashboardOptions();
+        var policyOptions = configuration.GetSection("BackupPolicies").Get<List<DatabaseBackupPolicyOptions>>()
+            ?? new List<DatabaseBackupPolicyOptions>();
+        var selectedPolicy = policyOptions.FirstOrDefault(x =>
+            string.Equals(x.DatabaseName, dashboardOptions.DatabaseName, StringComparison.OrdinalIgnoreCase));
 
         // Launch dashboard
         var dashboardService = serviceProvider.GetRequiredService<IDashboardMonitoringService>();
+        var policyFormatter = serviceProvider.GetRequiredService<IBackupPolicyDisplayFormatter>();
         var dashboard = new MonitoringDashboard(
-            dashboardService, 
-            dashboardOptions.DatabaseName, 
+            dashboardService,
+            policyFormatter,
+            dashboardOptions.DatabaseName,
             dashboardOptions.BackupVolumePath,
-            dashboardOptions.AutoRefreshIntervalSeconds);
+            dashboardOptions.AutoRefreshIntervalSeconds,
+            selectedPolicy);
 
         // Store service provider for child forms
         dashboard.Tag = serviceProvider;
@@ -92,6 +99,8 @@ static class Program
         // Core dashboard services
         services.AddSingleton<IDashboardMonitoringService, DashboardMonitoringService>();
         services.AddSingleton<IBackupJobMonitoringService, BackupJobMonitoringService>();
+        services.AddSingleton<ICronScheduleDescriptionService, CronScheduleDescriptionService>();
+        services.AddSingleton<IBackupPolicyDisplayFormatter, BackupPolicyDisplayFormatter>();
 
         // Other repositories (still in-memory for now)
         services.AddSingleton<IStorageHealthCheckRepository, InMemoryStorageHealthCheckRepository>();
