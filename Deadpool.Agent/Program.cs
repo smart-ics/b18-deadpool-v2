@@ -36,6 +36,7 @@ builder.Services.Configure<StorageMonitoringOptions>(
 // SQLite shared repository (used by Agent and UI)
 var sqlitePath = builder.Configuration.GetValue<string>("Deadpool:SqliteDatabasePath") ?? "deadpool.db";
 var fullSqlitePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, sqlitePath);
+var productionConnectionString = builder.Configuration.GetConnectionString("ProductionDatabase");
 
 builder.Services.AddSingleton<IBackupJobRepository>(sp =>
 {
@@ -52,9 +53,17 @@ builder.Services.AddSingleton<IScheduleTracker, InMemoryScheduleTracker>();
 builder.Services.AddSingleton<IStorageInfoProvider, Deadpool.Infrastructure.Storage.FileSystemStorageInfoProvider>();
 builder.Services.AddSingleton<IBackupSizeEstimator, Deadpool.Infrastructure.Estimation.RecentBackupSizeEstimator>();
 
-// Backup execution dependencies (using stubs for now)
-builder.Services.AddSingleton<IBackupExecutor, StubBackupExecutor>();
-builder.Services.AddSingleton<IDatabaseMetadataService, StubDatabaseMetadataService>();
+// Backup execution dependencies (real SQL Server if configured, stub fallback otherwise)
+builder.Services.AddSingleton<IBackupExecutor>(sp =>
+{
+    var logger = sp.GetRequiredService<ILoggerFactory>().CreateLogger("ProductionSqlRuntime");
+    return ProductionSqlRuntimeFactory.CreateBackupExecutor(productionConnectionString, logger);
+});
+builder.Services.AddSingleton<IDatabaseMetadataService>(sp =>
+{
+    var logger = sp.GetRequiredService<ILoggerFactory>().CreateLogger("ProductionSqlRuntime");
+    return ProductionSqlRuntimeFactory.CreateDatabaseMetadataService(productionConnectionString, logger);
+});
 
 // Health monitoring service
 builder.Services.AddSingleton<IBackupHealthMonitoringService>(sp =>
@@ -130,4 +139,8 @@ builder.Services.AddHostedService<BackupHealthMonitoringWorker>();
 builder.Services.AddHostedService<StorageMonitoringWorker>();
 
 var host = builder.Build();
+var startupLogger = host.Services.GetRequiredService<ILoggerFactory>().CreateLogger("ProductionSqlStartup");
+ProductionSqlRuntimeFactory.LogConnectivityCheckAsync(productionConnectionString, startupLogger)
+    .GetAwaiter()
+    .GetResult();
 host.Run();
