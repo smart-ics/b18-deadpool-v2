@@ -29,6 +29,18 @@ public static class ProductionSqlRuntimeFactory
         return new SqlServerDatabaseMetadataService(connectionString);
     }
 
+    public static IDatabaseConnectivityProbe CreateDatabaseConnectivityProbe(
+        string? connectionString, string? databaseName, ILogger logger)
+    {
+        if (string.IsNullOrWhiteSpace(connectionString) || string.IsNullOrWhiteSpace(databaseName))
+        {
+            logger.LogWarning("ProductionDatabase connection string or database name not configured — using StubDatabaseConnectivityProbe");
+            return new StubDatabaseConnectivityProbe();
+        }
+
+        return new SqlServerDatabaseConnectivityProbe(connectionString, databaseName);
+    }
+
     public static async Task LogConnectivityCheckAsync(string? connectionString, ILogger logger, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(connectionString))

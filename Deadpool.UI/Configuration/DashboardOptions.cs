@@ -3,14 +3,8 @@ namespace Deadpool.UI.Configuration;
 public class DashboardOptions
 {
     public string DatabaseName { get; set; } = "MyHospitalDB";
-    public string DatabaseConnectionString { get; set; } = string.Empty;
     public string BackupVolumePath { get; set; } = "C:\\Backups";
     public int AutoRefreshIntervalSeconds { get; set; } = 60;
-}
-
-public class DeadpoolDbOptions
-{
-    public string Path { get; set; } = string.Empty;
 }
 
 public class DatabaseBackupPolicyOptions

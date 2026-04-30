@@ -59,4 +59,32 @@ public class StorageHealthCheck
     }
 
     public bool IsHealthy() => OverallHealth == HealthStatus.Healthy;
+
+    private StorageHealthCheck(
+        string volumePath,
+        DateTime checkTime,
+        long totalBytes,
+        long freeBytes,
+        HealthStatus overallHealth,
+        List<string> warnings,
+        List<string> criticalFindings)
+    {
+        VolumePath = volumePath;
+        CheckTime = checkTime;
+        TotalBytes = totalBytes;
+        FreeBytes = freeBytes;
+        OverallHealth = overallHealth;
+        Warnings = warnings;
+        CriticalFindings = criticalFindings;
+    }
+
+    public static StorageHealthCheck Restore(
+        string volumePath,
+        DateTime checkTime,
+        long totalBytes,
+        long freeBytes,
+        HealthStatus overallHealth,
+        List<string> warnings,
+        List<string> criticalFindings)
+        => new StorageHealthCheck(volumePath, checkTime, totalBytes, freeBytes, overallHealth, warnings, criticalFindings);
 }

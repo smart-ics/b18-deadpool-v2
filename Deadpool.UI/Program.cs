@@ -1,13 +1,10 @@
 using Deadpool.Core.Interfaces;
 using Deadpool.Core.Services;
-using Deadpool.Infrastructure.Metadata;
 using Deadpool.Infrastructure.Persistence;
-using Deadpool.Infrastructure.Storage;
 using Deadpool.UI.Configuration;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Data.SqlClient;
 
 namespace Deadpool.UI;
 
@@ -21,10 +18,27 @@ static class Program
     {
         ApplicationConfiguration.Initialize();
 
-        // Build configuration
+        var baseDir = AppDomain.CurrentDomain.BaseDirectory;
+
+        var current = new DirectoryInfo(baseDir);
+
+        // Walk upward to locate portable root that contains appsettings.shared.json.
+        while (current != null && !File.Exists(Path.Combine(current.FullName, "appsettings.shared.json")))
+        {
+            current = current.Parent;
+        }
+
+        if (current == null)
+        {
+            throw new Exception("Cannot locate appsettings.shared.json");
+        }
+
+        var rootDir = current.FullName;
+
         var configuration = new ConfigurationBuilder()
-            .SetBasePath(AppDomain.CurrentDomain.BaseDirectory)
-            .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+            .SetBasePath(rootDir)
+            .AddJsonFile("appsettings.shared.json", optional: false, reloadOnChange: true)
+            .AddJsonFile(Path.Combine(baseDir, "appsettings.json"), optional: true, reloadOnChange: true)
             .Build();
 
         // Build service collection (pragmatic WinForms DI setup)
@@ -45,10 +59,8 @@ static class Program
         var dashboard = new MonitoringDashboard(
             dashboardService,
             policyFormatter,
-            serviceProvider.GetRequiredService<IDatabasePulseService>(),
             serviceProvider.GetRequiredService<ILogger<MonitoringDashboard>>(),
             dashboardOptions.DatabaseName,
-            GetServerAddress(dashboardOptions.DatabaseConnectionString),
             dashboardOptions.BackupVolumePath,
             dashboardOptions.AutoRefreshIntervalSeconds,
             selectedPolicy);
@@ -63,7 +75,6 @@ static class Program
     {
         // Configuration options
         services.Configure<DashboardOptions>(configuration.GetSection("Dashboard"));
-        services.Configure<DeadpoolDbOptions>(configuration.GetSection("DeadpoolDb"));
 
         // Logging (simple debug logging for UI)
         services.AddLogging(builder =>
@@ -72,14 +83,12 @@ static class Program
             builder.SetMinimumLevel(LogLevel.Information);
         });
 
-        // SQLite shared repository
-        var deadpoolDbOptions = configuration.GetSection("DeadpoolDb").Get<DeadpoolDbOptions>() ?? new DeadpoolDbOptions();
-        if (string.IsNullOrWhiteSpace(deadpoolDbOptions.Path))
+        // SQLite shared repositories (read-only from UI — Agent writes)
+        var sqlitePath = configuration.GetValue<string>("DeadpoolDb:Path");
+        if (string.IsNullOrWhiteSpace(sqlitePath))
         {
             throw new InvalidOperationException("DeadpoolDb:Path is required for shared SQLite database.");
         }
-
-        var sqlitePath = deadpoolDbOptions.Path;
 
         services.AddSingleton<IBackupJobRepository>(sp =>
         {
@@ -87,23 +96,22 @@ static class Program
             return new SqliteBackupJobRepository(sqlitePath, logger);
         });
 
-        // Storage monitoring service with proper options injection
-        services.AddSingleton<IStorageMonitoringService>(sp =>
+        services.AddSingleton<IBackupHealthCheckRepository>(sp =>
         {
-            var storageInfoProvider = sp.GetRequiredService<IStorageInfoProvider>();
+            var logger = sp.GetRequiredService<ILogger<SqliteBackupHealthCheckRepository>>();
+            return new SqliteBackupHealthCheckRepository(sqlitePath, logger);
+        });
 
-            // Load storage health options from configuration or use defaults
-            var storageConfig = configuration.GetSection("StorageHealth");
-            var storageHealthOptions = storageConfig.Exists()
-                ? new Deadpool.Core.Domain.ValueObjects.StorageHealthOptions(
-                    warningThresholdPercentage: storageConfig.GetValue<decimal>("WarningThresholdPercentage", 20m),
-                    criticalThresholdPercentage: storageConfig.GetValue<decimal>("CriticalThresholdPercentage", 10m),
-                    minimumWarningFreeSpaceBytes: storageConfig.GetValue<long>("MinimumWarningFreeSpaceGB", 50L) * 1024L * 1024 * 1024,
-                    minimumCriticalFreeSpaceBytes: storageConfig.GetValue<long>("MinimumCriticalFreeSpaceGB", 20L) * 1024L * 1024 * 1024)
-                : Deadpool.Core.Domain.ValueObjects.StorageHealthOptions.Default;
+        services.AddSingleton<IStorageHealthCheckRepository>(sp =>
+        {
+            var logger = sp.GetRequiredService<ILogger<SqliteStorageHealthCheckRepository>>();
+            return new SqliteStorageHealthCheckRepository(sqlitePath, logger);
+        });
 
-            // BackupSizeEstimator is optional for UI (not needed for display-only monitoring)
-            return new StorageMonitoringService(storageInfoProvider, storageHealthOptions, backupSizeEstimator: null);
+        services.AddSingleton<IDatabasePulseRepository>(sp =>
+        {
+            var logger = sp.GetRequiredService<ILogger<SqliteDatabasePulseRepository>>();
+            return new SqliteDatabasePulseRepository(sqlitePath, logger);
         });
 
         // Core dashboard services
@@ -111,34 +119,6 @@ static class Program
         services.AddSingleton<IBackupJobMonitoringService, BackupJobMonitoringService>();
         services.AddSingleton<ICronScheduleDescriptionService, CronScheduleDescriptionService>();
         services.AddSingleton<IBackupPolicyDisplayFormatter, BackupPolicyDisplayFormatter>();
-        services.AddSingleton<IDatabasePulseService, DatabasePulseService>();
-        services.AddSingleton<IDatabaseConnectivityProbe>(_ =>
-        {
-            var connectionString = configuration.GetValue<string>("Dashboard:DatabaseConnectionString") ?? string.Empty;
-            var databaseName = configuration.GetValue<string>("Dashboard:DatabaseName") ?? string.Empty;
-            return new SqlServerDatabaseConnectivityProbe(connectionString, databaseName);
-        });
-
-        // Other repositories (still in-memory for now)
-        services.AddSingleton<IStorageHealthCheckRepository, InMemoryStorageHealthCheckRepository>();
-
-        // Storage abstraction
-        services.AddSingleton<IStorageInfoProvider, FileSystemStorageInfoProvider>();
     }
 
-    private static string GetServerAddress(string connectionString)
-    {
-        if (string.IsNullOrWhiteSpace(connectionString))
-            return "Unknown";
-
-        try
-        {
-            var builder = new SqlConnectionStringBuilder(connectionString);
-            return string.IsNullOrWhiteSpace(builder.DataSource) ? "Unknown" : builder.DataSource;
-        }
-        catch
-        {
-            return "Unknown";
-        }
-    }
 }

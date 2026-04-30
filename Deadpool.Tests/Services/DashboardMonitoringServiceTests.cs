@@ -10,276 +10,203 @@ using Xunit;
 namespace Deadpool.Tests.Services;
 
 /// <summary>
-/// Pragmatic tests for dashboard monitoring service view logic.
+/// Tests for dashboard monitoring service — reads pre-computed health checks from repos.
 /// </summary>
 public class DashboardMonitoringServiceTests
 {
-    private readonly Mock<IBackupJobRepository> _repositoryMock;
-    private readonly Mock<IStorageMonitoringService> _storageMock;
+    private readonly Mock<IBackupJobRepository> _backupJobRepoMock;
+    private readonly Mock<IBackupHealthCheckRepository> _backupHealthRepoMock;
+    private readonly Mock<IStorageHealthCheckRepository> _storageHealthRepoMock;
+    private readonly Mock<IDatabasePulseRepository> _pulseRepoMock;
     private readonly DashboardMonitoringService _service;
     private const string DatabaseName = "TestDB";
     private const string VolumePath = "D:\\Backups";
 
     public DashboardMonitoringServiceTests()
     {
-        _repositoryMock = new Mock<IBackupJobRepository>();
-        _storageMock = new Mock<IStorageMonitoringService>();
+        _backupJobRepoMock = new Mock<IBackupJobRepository>();
+        _backupHealthRepoMock = new Mock<IBackupHealthCheckRepository>();
+        _storageHealthRepoMock = new Mock<IStorageHealthCheckRepository>();
+        _pulseRepoMock = new Mock<IDatabasePulseRepository>();
         _service = new DashboardMonitoringService(
-            _repositoryMock.Object,
-            _storageMock.Object,
+            _backupJobRepoMock.Object,
+            _backupHealthRepoMock.Object,
+            _storageHealthRepoMock.Object,
+            _pulseRepoMock.Object,
             NullLogger<DashboardMonitoringService>.Instance);
     }
 
     [Fact]
-    public async Task GetDashboardSnapshotAsync_ShouldReturnValidSnapshot()
+    public async Task GetDashboardSnapshotAsync_WithHealthyBackupCheck_MapsCorrectly()
     {
         // Arrange
-        var fullBackup = CreateCompletedBackup(BackupType.Full, hoursAgo: 12);
-        var diffBackup = CreateCompletedBackup(BackupType.Differential, hoursAgo: 2);
-        var logBackup = CreateCompletedBackup(BackupType.TransactionLog, minutesAgo: 15);
+        var check = CreateBackupHealthCheck(HealthStatus.Healthy,
+            lastFull: DateTime.UtcNow.AddHours(-12),
+            lastDiff: DateTime.UtcNow.AddHours(-2),
+            lastLog: DateTime.UtcNow.AddMinutes(-15));
 
-        _repositoryMock.Setup(x => x.GetLastSuccessfulBackupAsync(DatabaseName, BackupType.Full))
-            .ReturnsAsync(fullBackup);
-        _repositoryMock.Setup(x => x.GetLastSuccessfulBackupAsync(DatabaseName, BackupType.Differential))
-            .ReturnsAsync(diffBackup);
-        _repositoryMock.Setup(x => x.GetLastSuccessfulBackupAsync(DatabaseName, BackupType.TransactionLog))
-            .ReturnsAsync(logBackup);
-        _repositoryMock.Setup(x => x.GetLastFailedBackupAsync(DatabaseName))
-            .ReturnsAsync((BackupJob?)null);
-        _repositoryMock.Setup(x => x.GetLastSuccessfulFullBackupAsync(DatabaseName))
-            .ReturnsAsync(fullBackup);
-        _repositoryMock.Setup(x => x.GetRecentJobsAsync(DatabaseName, It.IsAny<int>()))
-            .ReturnsAsync(new[] { fullBackup, diffBackup, logBackup });
-
-        var storageHealth = CreateStorageHealth(HealthStatus.Healthy, freePercentage: 40);
-        _storageMock.Setup(x => x.CheckStorageHealthAsync(VolumePath))
-            .ReturnsAsync(storageHealth);
+        _backupHealthRepoMock.Setup(x => x.GetLatestHealthCheckAsync(DatabaseName))
+            .ReturnsAsync(check);
+        _storageHealthRepoMock.Setup(x => x.GetLatestHealthCheckAsync(VolumePath))
+            .ReturnsAsync((StorageHealthCheck?)null);
+        _pulseRepoMock.Setup(x => x.GetLatestAsync())
+            .ReturnsAsync((DatabasePulseRecord?)null);
+        SetupEmptyJobRepo();
 
         // Act
         var snapshot = await _service.GetDashboardSnapshotAsync(DatabaseName, VolumePath);
 
         // Assert
-        snapshot.Should().NotBeNull();
         snapshot.DatabaseName.Should().Be(DatabaseName);
-        snapshot.LastBackupStatus.Should().NotBeNull();
-        snapshot.LastBackupStatus.LastFullBackup.Should().Be(fullBackup.EndTime);
-        snapshot.LastBackupStatus.LastDifferentialBackup.Should().Be(diffBackup.EndTime);
-        snapshot.LastBackupStatus.LastLogBackup.Should().Be(logBackup.EndTime);
         snapshot.LastBackupStatus.OverallHealth.Should().Be(HealthStatus.Healthy);
-        snapshot.RecentJobs.Should().HaveCount(3);
-        snapshot.StorageStatus.Should().NotBeNull();
-        snapshot.StorageStatus.OverallHealth.Should().Be(HealthStatus.Healthy);
-        snapshot.ChainInitializationStatus.IsInitialized.Should().BeTrue();
+        snapshot.LastBackupStatus.LastFullBackup.Should().Be(check.LastSuccessfulFullBackup);
+        snapshot.LastBackupStatus.LastDifferentialBackup.Should().Be(check.LastSuccessfulDifferentialBackup);
+        snapshot.LastBackupStatus.LastLogBackup.Should().Be(check.LastSuccessfulLogBackup);
+        snapshot.LastBackupStatus.ChainHealthSummary.Should().Be("Healthy");
     }
 
     [Fact]
-    public async Task GetDashboardSnapshotAsync_NoFullBackup_ShouldReturnCriticalHealth()
+    public async Task GetDashboardSnapshotAsync_NoBackupHealthData_ReturnsWarningStatus()
     {
         // Arrange
-        _repositoryMock.Setup(x => x.GetLastSuccessfulBackupAsync(DatabaseName, BackupType.Full))
-            .ReturnsAsync((BackupJob?)null);
-        _repositoryMock.Setup(x => x.GetLastSuccessfulBackupAsync(DatabaseName, BackupType.Differential))
-            .ReturnsAsync((BackupJob?)null);
-        _repositoryMock.Setup(x => x.GetLastSuccessfulBackupAsync(DatabaseName, BackupType.TransactionLog))
-            .ReturnsAsync((BackupJob?)null);
-        _repositoryMock.Setup(x => x.GetLastFailedBackupAsync(DatabaseName))
-            .ReturnsAsync((BackupJob?)null);
-        _repositoryMock.Setup(x => x.GetLastSuccessfulFullBackupAsync(DatabaseName))
-            .ReturnsAsync((BackupJob?)null);
-        _repositoryMock.Setup(x => x.GetRecentJobsAsync(DatabaseName, It.IsAny<int>()))
-            .ReturnsAsync(Array.Empty<BackupJob>());
-
-        var storageHealth = CreateStorageHealth(HealthStatus.Healthy, freePercentage: 40);
-        _storageMock.Setup(x => x.CheckStorageHealthAsync(VolumePath))
-            .ReturnsAsync(storageHealth);
-
-        // Act
-        var snapshot = await _service.GetDashboardSnapshotAsync(DatabaseName, VolumePath);
-
-        // Assert
-        snapshot.LastBackupStatus.OverallHealth.Should().Be(HealthStatus.Critical);
-        snapshot.LastBackupStatus.CriticalIssues.Should().Contain(x => x.Contains("No Full backup found"));
-        snapshot.LastBackupStatus.ChainHealthSummary.Should().Contain("Broken");
-        snapshot.ChainInitializationStatus.IsInitialized.Should().BeFalse();
-        snapshot.ChainInitializationStatus.WarningMessage.Should().Contain("System not yet protected");
-    }
-
-    [Fact]
-    public async Task GetDashboardSnapshotAsync_FullBackupOverdue_ShouldReturnCritical()
-    {
-        // Arrange - Full backup over 72 hours old
-        var fullBackup = CreateCompletedBackup(BackupType.Full, hoursAgo: 80);
-
-        _repositoryMock.Setup(x => x.GetLastSuccessfulBackupAsync(DatabaseName, BackupType.Full))
-            .ReturnsAsync(fullBackup);
-        _repositoryMock.Setup(x => x.GetLastSuccessfulBackupAsync(DatabaseName, BackupType.Differential))
-            .ReturnsAsync((BackupJob?)null);
-        _repositoryMock.Setup(x => x.GetLastSuccessfulBackupAsync(DatabaseName, BackupType.TransactionLog))
-            .ReturnsAsync((BackupJob?)null);
-        _repositoryMock.Setup(x => x.GetLastFailedBackupAsync(DatabaseName))
-            .ReturnsAsync((BackupJob?)null);
-        _repositoryMock.Setup(x => x.GetLastSuccessfulFullBackupAsync(DatabaseName))
-            .ReturnsAsync(fullBackup);
-        _repositoryMock.Setup(x => x.GetRecentJobsAsync(DatabaseName, It.IsAny<int>()))
-            .ReturnsAsync(new[] { fullBackup });
-
-        var storageHealth = CreateStorageHealth(HealthStatus.Healthy, freePercentage: 40);
-        _storageMock.Setup(x => x.CheckStorageHealthAsync(VolumePath))
-            .ReturnsAsync(storageHealth);
-
-        // Act
-        var snapshot = await _service.GetDashboardSnapshotAsync(DatabaseName, VolumePath);
-
-        // Assert
-        snapshot.LastBackupStatus.OverallHealth.Should().Be(HealthStatus.Critical);
-        snapshot.LastBackupStatus.CriticalIssues.Should().Contain(x => x.Contains("hours old") && x.Contains(">72h"));
-        snapshot.LastBackupStatus.ChainHealthSummary.Should().Contain("Critical");
-    }
-
-    [Fact]
-    public async Task GetDashboardSnapshotAsync_FullBackupAging_ShouldReturnWarning()
-    {
-        // Arrange - Full backup between 48-72 hours old
-        var fullBackup = CreateCompletedBackup(BackupType.Full, hoursAgo: 50);
-
-        _repositoryMock.Setup(x => x.GetLastSuccessfulBackupAsync(DatabaseName, BackupType.Full))
-            .ReturnsAsync(fullBackup);
-        _repositoryMock.Setup(x => x.GetLastSuccessfulBackupAsync(DatabaseName, BackupType.Differential))
-            .ReturnsAsync((BackupJob?)null);
-        _repositoryMock.Setup(x => x.GetLastSuccessfulBackupAsync(DatabaseName, BackupType.TransactionLog))
-            .ReturnsAsync((BackupJob?)null);
-        _repositoryMock.Setup(x => x.GetLastFailedBackupAsync(DatabaseName))
-            .ReturnsAsync((BackupJob?)null);
-        _repositoryMock.Setup(x => x.GetLastSuccessfulFullBackupAsync(DatabaseName))
-            .ReturnsAsync(fullBackup);
-        _repositoryMock.Setup(x => x.GetRecentJobsAsync(DatabaseName, It.IsAny<int>()))
-            .ReturnsAsync(new[] { fullBackup });
-
-        var storageHealth = CreateStorageHealth(HealthStatus.Healthy, freePercentage: 40);
-        _storageMock.Setup(x => x.CheckStorageHealthAsync(VolumePath))
-            .ReturnsAsync(storageHealth);
+        _backupHealthRepoMock.Setup(x => x.GetLatestHealthCheckAsync(DatabaseName))
+            .ReturnsAsync((BackupHealthCheck?)null);
+        _storageHealthRepoMock.Setup(x => x.GetLatestHealthCheckAsync(VolumePath))
+            .ReturnsAsync((StorageHealthCheck?)null);
+        _pulseRepoMock.Setup(x => x.GetLatestAsync())
+            .ReturnsAsync((DatabasePulseRecord?)null);
+        SetupEmptyJobRepo();
 
         // Act
         var snapshot = await _service.GetDashboardSnapshotAsync(DatabaseName, VolumePath);
 
         // Assert
         snapshot.LastBackupStatus.OverallHealth.Should().Be(HealthStatus.Warning);
-        snapshot.LastBackupStatus.Warnings.Should().Contain(x => x.Contains("hours old") && x.Contains(">48h"));
-        snapshot.LastBackupStatus.ChainHealthSummary.Should().Contain("Warning");
+        snapshot.LastBackupStatus.Warnings.Should().Contain(x => x.Contains("Agent"));
     }
 
     [Fact]
-    public async Task GetDashboardSnapshotAsync_LogBackupStale_ShouldReturnWarning()
+    public async Task GetDashboardSnapshotAsync_CriticalBackupCheck_MapsHealthCorrectly()
     {
-        // Arrange - Log backup over 60 minutes old
-        var fullBackup = CreateCompletedBackup(BackupType.Full, hoursAgo: 12);
-        var logBackup = CreateCompletedBackup(BackupType.TransactionLog, minutesAgo: 90);
+        // Arrange
+        var check = CreateBackupHealthCheck(HealthStatus.Critical,
+            criticalFindings: new[] { "Full backup overdue" });
 
-        _repositoryMock.Setup(x => x.GetLastSuccessfulBackupAsync(DatabaseName, BackupType.Full))
-            .ReturnsAsync(fullBackup);
-        _repositoryMock.Setup(x => x.GetLastSuccessfulBackupAsync(DatabaseName, BackupType.Differential))
-            .ReturnsAsync((BackupJob?)null);
-        _repositoryMock.Setup(x => x.GetLastSuccessfulBackupAsync(DatabaseName, BackupType.TransactionLog))
-            .ReturnsAsync(logBackup);
-        _repositoryMock.Setup(x => x.GetLastFailedBackupAsync(DatabaseName))
-            .ReturnsAsync((BackupJob?)null);
-        _repositoryMock.Setup(x => x.GetLastSuccessfulFullBackupAsync(DatabaseName))
-            .ReturnsAsync(fullBackup);
-        _repositoryMock.Setup(x => x.GetRecentJobsAsync(DatabaseName, It.IsAny<int>()))
-            .ReturnsAsync(new[] { fullBackup, logBackup });
-
-        var storageHealth = CreateStorageHealth(HealthStatus.Healthy, freePercentage: 40);
-        _storageMock.Setup(x => x.CheckStorageHealthAsync(VolumePath))
-            .ReturnsAsync(storageHealth);
+        _backupHealthRepoMock.Setup(x => x.GetLatestHealthCheckAsync(DatabaseName))
+            .ReturnsAsync(check);
+        _storageHealthRepoMock.Setup(x => x.GetLatestHealthCheckAsync(VolumePath))
+            .ReturnsAsync((StorageHealthCheck?)null);
+        _pulseRepoMock.Setup(x => x.GetLatestAsync())
+            .ReturnsAsync((DatabasePulseRecord?)null);
+        SetupEmptyJobRepo();
 
         // Act
         var snapshot = await _service.GetDashboardSnapshotAsync(DatabaseName, VolumePath);
 
         // Assert
-        snapshot.LastBackupStatus.OverallHealth.Should().Be(HealthStatus.Warning);
-        snapshot.LastBackupStatus.Warnings.Should().Contain(x => x.Contains("Log backup") && x.Contains("minutes old"));
+        snapshot.LastBackupStatus.OverallHealth.Should().Be(HealthStatus.Critical);
+        snapshot.LastBackupStatus.CriticalIssues.Should().Contain("Full backup overdue");
+        snapshot.LastBackupStatus.ChainHealthSummary.Should().Be("Critical");
     }
 
     [Fact]
-    public async Task GetDashboardSnapshotAsync_RecentFailure_ShouldIncludeWarning()
+    public async Task GetDashboardSnapshotAsync_WithStorageHealthCheck_MapsCorrectly()
     {
         // Arrange
-        var fullBackup = CreateCompletedBackup(BackupType.Full, hoursAgo: 12);
-        var failedBackup = CreateFailedBackup(BackupType.TransactionLog, hoursAgo: 2, "Disk full");
+        _backupHealthRepoMock.Setup(x => x.GetLatestHealthCheckAsync(DatabaseName))
+            .ReturnsAsync((BackupHealthCheck?)null);
+        _pulseRepoMock.Setup(x => x.GetLatestAsync())
+            .ReturnsAsync((DatabasePulseRecord?)null);
+        SetupEmptyJobRepo();
 
-        _repositoryMock.Setup(x => x.GetLastSuccessfulBackupAsync(DatabaseName, BackupType.Full))
-            .ReturnsAsync(fullBackup);
-        _repositoryMock.Setup(x => x.GetLastSuccessfulBackupAsync(DatabaseName, BackupType.Differential))
-            .ReturnsAsync((BackupJob?)null);
-        _repositoryMock.Setup(x => x.GetLastSuccessfulBackupAsync(DatabaseName, BackupType.TransactionLog))
-            .ReturnsAsync((BackupJob?)null);
-        _repositoryMock.Setup(x => x.GetLastFailedBackupAsync(DatabaseName))
-            .ReturnsAsync(failedBackup);
-        _repositoryMock.Setup(x => x.GetLastSuccessfulFullBackupAsync(DatabaseName))
-            .ReturnsAsync(fullBackup);
-        _repositoryMock.Setup(x => x.GetRecentJobsAsync(DatabaseName, It.IsAny<int>()))
-            .ReturnsAsync(new[] { fullBackup, failedBackup });
-
-        var storageHealth = CreateStorageHealth(HealthStatus.Healthy, freePercentage: 40);
-        _storageMock.Setup(x => x.CheckStorageHealthAsync(VolumePath))
-            .ReturnsAsync(storageHealth);
-
-        // Act
-        var snapshot = await _service.GetDashboardSnapshotAsync(DatabaseName, VolumePath);
-
-        // Assert
-        snapshot.LastBackupStatus.Warnings.Should().Contain(x => x.Contains("Recent failure") && x.Contains("Disk full"));
-    }
-
-    [Fact]
-    public async Task GetDashboardSnapshotAsync_StorageCritical_ShouldReflectInSnapshot()
-    {
-        // Arrange
-        var fullBackup = CreateCompletedBackup(BackupType.Full, hoursAgo: 12);
-
-        _repositoryMock.Setup(x => x.GetLastSuccessfulBackupAsync(DatabaseName, BackupType.Full))
-            .ReturnsAsync(fullBackup);
-        _repositoryMock.Setup(x => x.GetLastSuccessfulBackupAsync(DatabaseName, BackupType.Differential))
-            .ReturnsAsync((BackupJob?)null);
-        _repositoryMock.Setup(x => x.GetLastSuccessfulBackupAsync(DatabaseName, BackupType.TransactionLog))
-            .ReturnsAsync((BackupJob?)null);
-        _repositoryMock.Setup(x => x.GetLastFailedBackupAsync(DatabaseName))
-            .ReturnsAsync((BackupJob?)null);
-        _repositoryMock.Setup(x => x.GetLastSuccessfulFullBackupAsync(DatabaseName))
-            .ReturnsAsync(fullBackup);
-        _repositoryMock.Setup(x => x.GetRecentJobsAsync(DatabaseName, It.IsAny<int>()))
-            .ReturnsAsync(new[] { fullBackup });
-
-        var storageHealth = CreateStorageHealth(HealthStatus.Critical, freePercentage: 5);
-        _storageMock.Setup(x => x.CheckStorageHealthAsync(VolumePath))
-            .ReturnsAsync(storageHealth);
+        var storageCheck = CreateStorageHealthCheck(HealthStatus.Critical, freePercentage: 5);
+        _storageHealthRepoMock.Setup(x => x.GetLatestHealthCheckAsync(VolumePath))
+            .ReturnsAsync(storageCheck);
 
         // Act
         var snapshot = await _service.GetDashboardSnapshotAsync(DatabaseName, VolumePath);
 
         // Assert
         snapshot.StorageStatus.OverallHealth.Should().Be(HealthStatus.Critical);
-        snapshot.StorageStatus.FreePercentage.Should().BeApproximately(5m, 0.001m);
+        snapshot.StorageStatus.VolumePath.Should().Be(VolumePath);
+        snapshot.StorageStatus.FreePercentage.Should().BeApproximately(5m, 0.1m);
     }
 
     [Fact]
-    public async Task GetDashboardSnapshotAsync_NoFullBackup_ShouldSetChainNotInitialized()
+    public async Task GetDashboardSnapshotAsync_NoStorageData_ReturnsWarning()
     {
         // Arrange
-        _repositoryMock.Setup(x => x.GetLastSuccessfulBackupAsync(DatabaseName, BackupType.Full))
+        _backupHealthRepoMock.Setup(x => x.GetLatestHealthCheckAsync(DatabaseName))
+            .ReturnsAsync((BackupHealthCheck?)null);
+        _storageHealthRepoMock.Setup(x => x.GetLatestHealthCheckAsync(VolumePath))
+            .ReturnsAsync((StorageHealthCheck?)null);
+        _pulseRepoMock.Setup(x => x.GetLatestAsync())
+            .ReturnsAsync((DatabasePulseRecord?)null);
+        SetupEmptyJobRepo();
+
+        // Act
+        var snapshot = await _service.GetDashboardSnapshotAsync(DatabaseName, VolumePath);
+
+        // Assert
+        snapshot.StorageStatus.OverallHealth.Should().Be(HealthStatus.Warning);
+        snapshot.StorageStatus.Warnings.Should().Contain(x => x.Contains("Agent"));
+    }
+
+    [Fact]
+    public async Task GetDashboardSnapshotAsync_WithPulseRecord_IncludesInSnapshot()
+    {
+        // Arrange
+        _backupHealthRepoMock.Setup(x => x.GetLatestHealthCheckAsync(DatabaseName))
+            .ReturnsAsync((BackupHealthCheck?)null);
+        _storageHealthRepoMock.Setup(x => x.GetLatestHealthCheckAsync(VolumePath))
+            .ReturnsAsync((StorageHealthCheck?)null);
+        SetupEmptyJobRepo();
+
+        var pulseRecord = new DatabasePulseRecord(DateTime.UtcNow.AddSeconds(-30), HealthStatus.Healthy);
+        _pulseRepoMock.Setup(x => x.GetLatestAsync())
+            .ReturnsAsync(pulseRecord);
+
+        // Act
+        var snapshot = await _service.GetDashboardSnapshotAsync(DatabaseName, VolumePath);
+
+        // Assert
+        snapshot.DatabasePulseStatus.Should().NotBeNull();
+        snapshot.DatabasePulseStatus!.Status.Should().Be(HealthStatus.Healthy);
+    }
+
+    [Fact]
+    public async Task GetDashboardSnapshotAsync_NoPulseData_SnapshotHasNullPulse()
+    {
+        // Arrange
+        _backupHealthRepoMock.Setup(x => x.GetLatestHealthCheckAsync(DatabaseName))
+            .ReturnsAsync((BackupHealthCheck?)null);
+        _storageHealthRepoMock.Setup(x => x.GetLatestHealthCheckAsync(VolumePath))
+            .ReturnsAsync((StorageHealthCheck?)null);
+        _pulseRepoMock.Setup(x => x.GetLatestAsync())
+            .ReturnsAsync((DatabasePulseRecord?)null);
+        SetupEmptyJobRepo();
+
+        // Act
+        var snapshot = await _service.GetDashboardSnapshotAsync(DatabaseName, VolumePath);
+
+        // Assert
+        snapshot.DatabasePulseStatus.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetDashboardSnapshotAsync_NoFullBackup_ChainNotInitialized()
+    {
+        // Arrange
+        _backupHealthRepoMock.Setup(x => x.GetLatestHealthCheckAsync(DatabaseName))
+            .ReturnsAsync((BackupHealthCheck?)null);
+        _storageHealthRepoMock.Setup(x => x.GetLatestHealthCheckAsync(VolumePath))
+            .ReturnsAsync((StorageHealthCheck?)null);
+        _pulseRepoMock.Setup(x => x.GetLatestAsync())
+            .ReturnsAsync((DatabasePulseRecord?)null);
+        _backupJobRepoMock.Setup(x => x.GetLastSuccessfulFullBackupAsync(DatabaseName))
             .ReturnsAsync((BackupJob?)null);
-        _repositoryMock.Setup(x => x.GetLastSuccessfulBackupAsync(DatabaseName, BackupType.Differential))
-            .ReturnsAsync((BackupJob?)null);
-        _repositoryMock.Setup(x => x.GetLastSuccessfulBackupAsync(DatabaseName, BackupType.TransactionLog))
-            .ReturnsAsync((BackupJob?)null);
-        _repositoryMock.Setup(x => x.GetLastFailedBackupAsync(DatabaseName))
-            .ReturnsAsync((BackupJob?)null);
-        _repositoryMock.Setup(x => x.GetLastSuccessfulFullBackupAsync(DatabaseName))
-            .ReturnsAsync((BackupJob?)null);
-        _repositoryMock.Setup(x => x.GetRecentJobsAsync(DatabaseName, It.IsAny<int>()))
+        _backupJobRepoMock.Setup(x => x.GetRecentJobsAsync(DatabaseName, It.IsAny<int>()))
             .ReturnsAsync(Array.Empty<BackupJob>());
-        _storageMock.Setup(x => x.CheckStorageHealthAsync(VolumePath))
-            .ReturnsAsync(CreateStorageHealth(HealthStatus.Healthy, 40));
 
         // Act
         var snapshot = await _service.GetDashboardSnapshotAsync(DatabaseName, VolumePath);
@@ -287,28 +214,25 @@ public class DashboardMonitoringServiceTests
         // Assert
         snapshot.ChainInitializationStatus.IsInitialized.Should().BeFalse();
         snapshot.ChainInitializationStatus.LastValidFullBackupTime.Should().BeNull();
+        snapshot.ChainInitializationStatus.WarningMessage.Should().Contain("System not yet protected");
     }
 
     [Fact]
-    public async Task GetDashboardSnapshotAsync_FullExists_ShouldSetChainInitializedAndTimestamp()
+    public async Task GetDashboardSnapshotAsync_FullBackupExists_ChainInitialized()
     {
         // Arrange
         var fullBackup = CreateCompletedBackup(BackupType.Full, hoursAgo: 1);
 
-        _repositoryMock.Setup(x => x.GetLastSuccessfulBackupAsync(DatabaseName, BackupType.Full))
+        _backupHealthRepoMock.Setup(x => x.GetLatestHealthCheckAsync(DatabaseName))
+            .ReturnsAsync((BackupHealthCheck?)null);
+        _storageHealthRepoMock.Setup(x => x.GetLatestHealthCheckAsync(VolumePath))
+            .ReturnsAsync((StorageHealthCheck?)null);
+        _pulseRepoMock.Setup(x => x.GetLatestAsync())
+            .ReturnsAsync((DatabasePulseRecord?)null);
+        _backupJobRepoMock.Setup(x => x.GetLastSuccessfulFullBackupAsync(DatabaseName))
             .ReturnsAsync(fullBackup);
-        _repositoryMock.Setup(x => x.GetLastSuccessfulBackupAsync(DatabaseName, BackupType.Differential))
-            .ReturnsAsync((BackupJob?)null);
-        _repositoryMock.Setup(x => x.GetLastSuccessfulBackupAsync(DatabaseName, BackupType.TransactionLog))
-            .ReturnsAsync((BackupJob?)null);
-        _repositoryMock.Setup(x => x.GetLastFailedBackupAsync(DatabaseName))
-            .ReturnsAsync((BackupJob?)null);
-        _repositoryMock.Setup(x => x.GetLastSuccessfulFullBackupAsync(DatabaseName))
-            .ReturnsAsync(fullBackup);
-        _repositoryMock.Setup(x => x.GetRecentJobsAsync(DatabaseName, It.IsAny<int>()))
+        _backupJobRepoMock.Setup(x => x.GetRecentJobsAsync(DatabaseName, It.IsAny<int>()))
             .ReturnsAsync(new[] { fullBackup });
-        _storageMock.Setup(x => x.CheckStorageHealthAsync(VolumePath))
-            .ReturnsAsync(CreateStorageHealth(HealthStatus.Healthy, 40));
 
         // Act
         var snapshot = await _service.GetDashboardSnapshotAsync(DatabaseName, VolumePath);
@@ -319,25 +243,19 @@ public class DashboardMonitoringServiceTests
     }
 
     [Fact]
-    public async Task GetDashboardSnapshotAsync_RepositoryFails_ShouldSetChainUnknown()
+    public async Task GetDashboardSnapshotAsync_JobRepoFails_ChainStatusUnknown()
     {
         // Arrange
-        var fullBackup = CreateCompletedBackup(BackupType.Full, hoursAgo: 1);
-
-        _repositoryMock.Setup(x => x.GetLastSuccessfulBackupAsync(DatabaseName, BackupType.Full))
-            .ReturnsAsync(fullBackup);
-        _repositoryMock.Setup(x => x.GetLastSuccessfulBackupAsync(DatabaseName, BackupType.Differential))
-            .ReturnsAsync((BackupJob?)null);
-        _repositoryMock.Setup(x => x.GetLastSuccessfulBackupAsync(DatabaseName, BackupType.TransactionLog))
-            .ReturnsAsync((BackupJob?)null);
-        _repositoryMock.Setup(x => x.GetLastFailedBackupAsync(DatabaseName))
-            .ReturnsAsync((BackupJob?)null);
-        _repositoryMock.Setup(x => x.GetLastSuccessfulFullBackupAsync(DatabaseName))
+        _backupHealthRepoMock.Setup(x => x.GetLatestHealthCheckAsync(DatabaseName))
+            .ReturnsAsync((BackupHealthCheck?)null);
+        _storageHealthRepoMock.Setup(x => x.GetLatestHealthCheckAsync(VolumePath))
+            .ReturnsAsync((StorageHealthCheck?)null);
+        _pulseRepoMock.Setup(x => x.GetLatestAsync())
+            .ReturnsAsync((DatabasePulseRecord?)null);
+        _backupJobRepoMock.Setup(x => x.GetLastSuccessfulFullBackupAsync(DatabaseName))
             .ThrowsAsync(new InvalidOperationException("Repository unavailable"));
-        _repositoryMock.Setup(x => x.GetRecentJobsAsync(DatabaseName, It.IsAny<int>()))
-            .ReturnsAsync(new[] { fullBackup });
-        _storageMock.Setup(x => x.CheckStorageHealthAsync(VolumePath))
-            .ReturnsAsync(CreateStorageHealth(HealthStatus.Healthy, 40));
+        _backupJobRepoMock.Setup(x => x.GetRecentJobsAsync(DatabaseName, It.IsAny<int>()))
+            .ReturnsAsync(Array.Empty<BackupJob>());
 
         // Act
         var snapshot = await _service.GetDashboardSnapshotAsync(DatabaseName, VolumePath);
@@ -348,104 +266,56 @@ public class DashboardMonitoringServiceTests
         snapshot.ChainInitializationStatus.WarningMessage.Should().Contain("Backup status unknown");
     }
 
-    [Fact]
-    public async Task GetDashboardSnapshotAsync_FullExists_ShouldSetChainInitialized_WithoutBootstrapTracker()
+    private void SetupEmptyJobRepo()
     {
-        // Arrange
-        var fullBackup = CreateCompletedBackup(BackupType.Full, hoursAgo: 1);
-
-        _repositoryMock.Setup(x => x.GetLastSuccessfulBackupAsync(DatabaseName, BackupType.Full))
-            .ReturnsAsync(fullBackup);
-        _repositoryMock.Setup(x => x.GetLastSuccessfulBackupAsync(DatabaseName, BackupType.Differential))
+        _backupJobRepoMock.Setup(x => x.GetLastSuccessfulFullBackupAsync(DatabaseName))
             .ReturnsAsync((BackupJob?)null);
-        _repositoryMock.Setup(x => x.GetLastSuccessfulBackupAsync(DatabaseName, BackupType.TransactionLog))
-            .ReturnsAsync((BackupJob?)null);
-        _repositoryMock.Setup(x => x.GetLastFailedBackupAsync(DatabaseName))
-            .ReturnsAsync((BackupJob?)null);
-        _repositoryMock.Setup(x => x.GetLastSuccessfulFullBackupAsync(DatabaseName))
-            .ReturnsAsync(fullBackup);
-        _repositoryMock.Setup(x => x.GetRecentJobsAsync(DatabaseName, It.IsAny<int>()))
-            .ReturnsAsync(new[] { fullBackup });
-        _storageMock.Setup(x => x.CheckStorageHealthAsync(VolumePath))
-            .ReturnsAsync(CreateStorageHealth(HealthStatus.Healthy, 40));
-
-        // Act
-        var snapshot = await _service.GetDashboardSnapshotAsync(DatabaseName, VolumePath);
-
-        // Assert
-        snapshot.ChainInitializationStatus.IsInitialized.Should().BeTrue();
+        _backupJobRepoMock.Setup(x => x.GetRecentJobsAsync(DatabaseName, It.IsAny<int>()))
+            .ReturnsAsync(Array.Empty<BackupJob>());
     }
 
-    [Fact]
-    public async Task GetDashboardSnapshotAsync_HasFullButLastFullMissing_ShouldForceNotInitialized()
+    private static BackupHealthCheck CreateBackupHealthCheck(
+        HealthStatus health,
+        DateTime? lastFull = null,
+        DateTime? lastDiff = null,
+        DateTime? lastLog = null,
+        string[]? warnings = null,
+        string[]? criticalFindings = null)
     {
-        // Arrange
-        var fullBackup = CreateCompletedBackup(BackupType.Full, hoursAgo: 1);
-
-        _repositoryMock.Setup(x => x.GetLastSuccessfulBackupAsync(DatabaseName, BackupType.Full))
-            .ReturnsAsync(fullBackup);
-        _repositoryMock.Setup(x => x.GetLastSuccessfulBackupAsync(DatabaseName, BackupType.Differential))
-            .ReturnsAsync((BackupJob?)null);
-        _repositoryMock.Setup(x => x.GetLastSuccessfulBackupAsync(DatabaseName, BackupType.TransactionLog))
-            .ReturnsAsync((BackupJob?)null);
-        _repositoryMock.Setup(x => x.GetLastFailedBackupAsync(DatabaseName))
-            .ReturnsAsync((BackupJob?)null);
-        _repositoryMock.Setup(x => x.GetLastSuccessfulFullBackupAsync(DatabaseName))
-            .ReturnsAsync((BackupJob?)null);
-        _repositoryMock.Setup(x => x.GetRecentJobsAsync(DatabaseName, It.IsAny<int>()))
-            .ReturnsAsync(new[] { fullBackup });
-        _storageMock.Setup(x => x.CheckStorageHealthAsync(VolumePath))
-            .ReturnsAsync(CreateStorageHealth(HealthStatus.Healthy, 40));
-
-        // Act
-        var snapshot = await _service.GetDashboardSnapshotAsync(DatabaseName, VolumePath);
-
-        // Assert
-        snapshot.ChainInitializationStatus.IsInitialized.Should().BeFalse();
-        snapshot.ChainInitializationStatus.LastValidFullBackupTime.Should().BeNull();
+        return BackupHealthCheck.Restore(
+            DatabaseName,
+            DateTime.UtcNow,
+            health,
+            lastFull,
+            lastDiff,
+            lastLog,
+            lastFailedBackup: null,
+            warnings?.ToList() ?? new List<string>(),
+            criticalFindings?.ToList() ?? new List<string>(),
+            limitations: new List<string>());
     }
 
-    private BackupJob CreateCompletedBackup(BackupType type, int hoursAgo = 0, int minutesAgo = 0)
+    private static StorageHealthCheck CreateStorageHealthCheck(HealthStatus health, decimal freePercentage)
     {
-        var job = new BackupJob(DatabaseName, type, $"D:\\Backups\\{type}_{Guid.NewGuid()}.bak");
-
-        job.MarkAsRunning();
-        job.MarkAsCompleted(1024 * 1024 * 100); // 100 MB
-
-        // Fix EndTime to match the desired age
-        typeof(BackupJob).GetProperty(nameof(BackupJob.EndTime))!
-            .SetValue(job, DateTime.UtcNow.AddHours(-hoursAgo).AddMinutes(-minutesAgo));
-
-        return job;
-    }
-
-    private BackupJob CreateFailedBackup(BackupType type, int hoursAgo, string errorMessage)
-    {
-        var job = new BackupJob(DatabaseName, type, $"D:\\Backups\\{type}_{Guid.NewGuid()}.bak");
-
-        job.MarkAsRunning();
-        job.MarkAsFailed(errorMessage);
-
-        return job;
-    }
-
-    private StorageHealthCheck CreateStorageHealth(HealthStatus health, decimal freePercentage)
-    {
-        var storageHealth = new StorageHealthCheck(VolumePath);
         var totalBytes = 1024L * 1024 * 1024 * 1024; // 1 TB
         var freeBytes = (long)(totalBytes * (freePercentage / 100m));
 
-        storageHealth.RecordStorageMetrics(totalBytes, freeBytes);
+        var warnings = health == HealthStatus.Warning ? new List<string> { "Storage low" } : new List<string>();
+        var criticalFindings = health == HealthStatus.Critical ? new List<string> { "Storage critically low" } : new List<string>();
 
-        if (health == HealthStatus.Warning)
-        {
-            storageHealth.AddWarning("Storage low");
-        }
-        else if (health == HealthStatus.Critical)
-        {
-            storageHealth.AddCriticalFinding("Storage critically low");
-        }
+        return StorageHealthCheck.Restore(
+            VolumePath, DateTime.UtcNow, totalBytes, freeBytes, health, warnings, criticalFindings);
+    }
 
-        return storageHealth;
+    private static BackupJob CreateCompletedBackup(BackupType type, int hoursAgo = 0)
+    {
+        var job = new BackupJob(DatabaseName, type, $"D:\\Backups\\{type}_{Guid.NewGuid()}.bak");
+        job.MarkAsRunning();
+        job.MarkAsCompleted(1024 * 1024 * 100);
+
+        typeof(BackupJob).GetProperty(nameof(BackupJob.EndTime))!
+            .SetValue(job, DateTime.UtcNow.AddHours(-hoursAgo));
+
+        return job;
     }
 }

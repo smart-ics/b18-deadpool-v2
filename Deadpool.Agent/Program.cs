@@ -9,9 +9,35 @@ using Deadpool.Infrastructure.FileCopy;
 using Deadpool.Infrastructure.Metadata;
 using Deadpool.Infrastructure.Persistence;
 using Deadpool.Infrastructure.Scheduling;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 
 var builder = Host.CreateApplicationBuilder(args);
+
+var baseDir = AppDomain.CurrentDomain.BaseDirectory;
+
+var current = new DirectoryInfo(baseDir);
+
+// Walk upward to locate portable root that contains appsettings.shared.json.
+while (current != null && !File.Exists(Path.Combine(current.FullName, "appsettings.shared.json")))
+{
+    current = current.Parent;
+}
+
+if (current == null)
+{
+    throw new Exception("Cannot locate appsettings.shared.json");
+}
+
+var rootDir = current.FullName;
+
+var configuration = new ConfigurationBuilder()
+    .SetBasePath(rootDir)
+    .AddJsonFile("appsettings.shared.json", optional: false, reloadOnChange: true)
+    .AddJsonFile(Path.Combine(baseDir, "appsettings.json"), optional: true, reloadOnChange: true)
+    .Build();
+
+builder.Configuration.AddConfiguration(configuration);
 
 // Backup-policy configuration
 builder.Services.Configure<List<DatabaseBackupPolicyOptions>>(
@@ -33,6 +59,10 @@ builder.Services.Configure<HealthMonitoringOptions>(
 builder.Services.Configure<StorageMonitoringOptions>(
     builder.Configuration.GetSection("StorageMonitoring"));
 
+// Database pulse configuration
+builder.Services.Configure<DatabasePulseOptions>(
+    builder.Configuration.GetSection("DatabasePulse"));
+
 // SQLite shared repository (used by Agent and UI)
 var sqlitePath = builder.Configuration.GetValue<string>("DeadpoolDb:Path");
 if (string.IsNullOrWhiteSpace(sqlitePath))
@@ -48,14 +78,36 @@ builder.Services.AddSingleton<IBackupJobRepository>(sp =>
     return new SqliteBackupJobRepository(sqlitePath, logger);
 });
 
-// Other repositories (still in-memory for now)
-builder.Services.AddSingleton<IBackupHealthCheckRepository, InMemoryBackupHealthCheckRepository>();
-builder.Services.AddSingleton<IStorageHealthCheckRepository, InMemoryStorageHealthCheckRepository>();
+// Health check repositories — SQLite, shared with UI
+builder.Services.AddSingleton<IBackupHealthCheckRepository>(sp =>
+{
+    var logger = sp.GetRequiredService<ILogger<SqliteBackupHealthCheckRepository>>();
+    return new SqliteBackupHealthCheckRepository(sqlitePath, logger);
+});
+builder.Services.AddSingleton<IStorageHealthCheckRepository>(sp =>
+{
+    var logger = sp.GetRequiredService<ILogger<SqliteStorageHealthCheckRepository>>();
+    return new SqliteStorageHealthCheckRepository(sqlitePath, logger);
+});
+builder.Services.AddSingleton<IDatabasePulseRepository>(sp =>
+{
+    var logger = sp.GetRequiredService<ILogger<SqliteDatabasePulseRepository>>();
+    return new SqliteDatabasePulseRepository(sqlitePath, logger);
+});
 builder.Services.AddSingleton<IScheduleTracker, InMemoryScheduleTracker>();
 
 // Storage monitoring dependencies
 builder.Services.AddSingleton<IStorageInfoProvider, Deadpool.Infrastructure.Storage.FileSystemStorageInfoProvider>();
 builder.Services.AddSingleton<IBackupSizeEstimator, Deadpool.Infrastructure.Estimation.RecentBackupSizeEstimator>();
+
+// Database connectivity probe for pulse worker
+builder.Services.AddSingleton<IDatabaseConnectivityProbe>(sp =>
+{
+    var logger = sp.GetRequiredService<ILoggerFactory>().CreateLogger("ProductionSqlRuntime");
+    var firstDb = builder.Configuration.GetSection("BackupPolicies")
+        .Get<List<DatabaseBackupPolicyOptions>>()?.FirstOrDefault()?.DatabaseName;
+    return ProductionSqlRuntimeFactory.CreateDatabaseConnectivityProbe(productionConnectionString, firstDb, logger);
+});
 
 // Backup execution dependencies (real SQL Server if configured, stub fallback otherwise)
 builder.Services.AddSingleton<IBackupExecutor>(sp =>
@@ -141,6 +193,7 @@ builder.Services.AddHostedService<BackupSchedulerWorker>();
 builder.Services.AddHostedService<BackupExecutionWorker>();
 builder.Services.AddHostedService<BackupHealthMonitoringWorker>();
 builder.Services.AddHostedService<StorageMonitoringWorker>();
+builder.Services.AddHostedService<DatabasePulseWorker>();
 
 var host = builder.Build();
 var startupLogger = host.Services.GetRequiredService<ILoggerFactory>().CreateLogger("ProductionSqlStartup");

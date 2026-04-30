@@ -14,10 +14,8 @@ public partial class MonitoringDashboard : Form
 {
     private readonly IDashboardMonitoringService _dashboardService;
     private readonly IBackupPolicyDisplayFormatter _policyDisplayFormatter;
-    private readonly IDatabasePulseService _databasePulseService;
     private readonly ILogger<MonitoringDashboard> _logger;
     private readonly string _databaseName;
-    private readonly string _databaseServerAddress;
     private readonly string _backupVolumePath;
     private readonly DatabaseBackupPolicyOptions? _backupPolicy;
     private readonly System.Windows.Forms.Timer? _autoRefreshTimer;
@@ -26,20 +24,16 @@ public partial class MonitoringDashboard : Form
     public MonitoringDashboard(
         IDashboardMonitoringService dashboardService,
         IBackupPolicyDisplayFormatter policyDisplayFormatter,
-        IDatabasePulseService databasePulseService,
         ILogger<MonitoringDashboard> logger,
         string databaseName,
-        string databaseServerAddress,
         string backupVolumePath,
         int autoRefreshIntervalSeconds = 60,
         DatabaseBackupPolicyOptions? backupPolicy = null)
     {
         _dashboardService = dashboardService ?? throw new ArgumentNullException(nameof(dashboardService));
         _policyDisplayFormatter = policyDisplayFormatter ?? throw new ArgumentNullException(nameof(policyDisplayFormatter));
-        _databasePulseService = databasePulseService ?? throw new ArgumentNullException(nameof(databasePulseService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _databaseName = databaseName ?? throw new ArgumentNullException(nameof(databaseName));
-        _databaseServerAddress = databaseServerAddress ?? throw new ArgumentNullException(nameof(databaseServerAddress));
         _backupVolumePath = backupVolumePath ?? throw new ArgumentNullException(nameof(backupVolumePath));
         _backupPolicy = backupPolicy;
 
@@ -103,7 +97,7 @@ public partial class MonitoringDashboard : Form
             DisplayRecentJobs(snapshot.RecentJobs);
             DisplayStorageStatus(snapshot.StorageStatus);
             DisplayChainInitializationStatus(snapshot.ChainInitializationStatus);
-            await DisplayDatabasePulseAsync();
+            DisplayDatabasePulse(snapshot.DatabasePulseStatus);
 
             _lastUpdateTime = snapshot.SnapshotTime;
             lblLastRefresh.Text = $"Last refresh: {snapshot.SnapshotTime:yyyy-MM-dd HH:mm:ss} UTC";
@@ -334,25 +328,32 @@ public partial class MonitoringDashboard : Form
     private void DisplayDatabaseTopology()
     {
         lblDbName.Text = $"Database: {_databaseName}";
-        lblDbServer.Text = $"Production SQL Server: {_databaseServerAddress}";
+        lblDbServer.Text = "Production SQL Server: (see Agent configuration)";
         lblDbRecoveryModel.Text = $"Recovery Model: {(_backupPolicy?.RecoveryModel ?? "Unknown")}";
 
         var backupServer = ResolveBackupStorageServer(_backupVolumePath);
-        lblTopologyProdServer.Text = $"Production DB Server: {_databaseServerAddress}";
+        lblTopologyProdServer.Text = "Production DB Server: (see Agent configuration)";
         lblTopologyBackupServer.Text = $"Backup Storage Server: {backupServer}";
         lblTopologyDestinationPath.Text = $"Backup Destination: {_backupVolumePath}";
     }
 
-    private async Task DisplayDatabasePulseAsync()
+    private void DisplayDatabasePulse(DatabasePulseStatus? pulse)
     {
-        var result = await _databasePulseService.CheckAsync();
-        lblPulseStatus.Text = $"Status: {result.Status}";
-        lblPulseStatus.ForeColor = GetHealthColor(result.Status);
-        lblPulseLastChecked.Text = $"Last Checked: {result.LastCheckedUtc:yyyy-MM-dd HH:mm:ss} UTC";
-
-        if (result.Status == HealthStatus.Critical && !string.IsNullOrWhiteSpace(result.ErrorMessage))
+        if (pulse == null)
         {
-            _logger.LogError("Database connectivity critical. Error: {ErrorMessage}", result.ErrorMessage);
+            lblPulseStatus.Text = "Status: Unknown";
+            lblPulseStatus.ForeColor = Color.Gray;
+            lblPulseLastChecked.Text = "Last Checked: --";
+            return;
+        }
+
+        lblPulseStatus.Text = $"Status: {pulse.Status}";
+        lblPulseStatus.ForeColor = GetHealthColor(pulse.Status);
+        lblPulseLastChecked.Text = $"Last Checked: {pulse.LastCheckedUtc:yyyy-MM-dd HH:mm:ss} UTC";
+
+        if (pulse.Status == HealthStatus.Critical && !string.IsNullOrWhiteSpace(pulse.ErrorMessage))
+        {
+            _logger.LogError("Database connectivity critical. Error: {ErrorMessage}", pulse.ErrorMessage);
         }
     }
 

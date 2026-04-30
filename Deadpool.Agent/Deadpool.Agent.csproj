@@ -11,6 +11,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>dotnet-Deadpool.Agent-f3d5f49b-f2e8-4e6f-acd9-373bbd127886</UserSecretsId>
+    <AssemblyVersion>1.0.1</AssemblyVersion>
+    <FileVersion>1.0.1</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -22,4 +24,5 @@
     <ProjectReference Include="..\Deadpool.Core\Deadpool.Core.csproj" />
     <ProjectReference Include="..\Deadpool.Infrastructure\Deadpool.Infrastructure.csproj" />
   </ItemGroup>
+
 </Project>

@@ -79,4 +79,45 @@ public class BackupHealthCheck
     public bool IsHealthy() => OverallHealth == HealthStatus.Healthy;
     public bool HasWarnings() => OverallHealth == HealthStatus.Warning;
     public bool IsCritical() => OverallHealth == HealthStatus.Critical;
+
+    private BackupHealthCheck(
+        string databaseName,
+        DateTime checkTime,
+        HealthStatus overallHealth,
+        DateTime? lastSuccessfulFullBackup,
+        DateTime? lastSuccessfulDifferentialBackup,
+        DateTime? lastSuccessfulLogBackup,
+        DateTime? lastFailedBackup,
+        List<string> warnings,
+        List<string> criticalFindings,
+        List<string> limitations)
+    {
+        DatabaseName = databaseName;
+        CheckTime = checkTime;
+        OverallHealth = overallHealth;
+        LastSuccessfulFullBackup = lastSuccessfulFullBackup;
+        LastSuccessfulDifferentialBackup = lastSuccessfulDifferentialBackup;
+        LastSuccessfulLogBackup = lastSuccessfulLogBackup;
+        LastFailedBackup = lastFailedBackup;
+        Warnings = warnings;
+        CriticalFindings = criticalFindings;
+        Limitations = limitations;
+    }
+
+    public static BackupHealthCheck Restore(
+        string databaseName,
+        DateTime checkTime,
+        HealthStatus overallHealth,
+        DateTime? lastSuccessfulFullBackup,
+        DateTime? lastSuccessfulDifferentialBackup,
+        DateTime? lastSuccessfulLogBackup,
+        DateTime? lastFailedBackup,
+        List<string> warnings,
+        List<string> criticalFindings,
+        List<string> limitations)
+        => new BackupHealthCheck(
+            databaseName, checkTime, overallHealth,
+            lastSuccessfulFullBackup, lastSuccessfulDifferentialBackup,
+            lastSuccessfulLogBackup, lastFailedBackup,
+            warnings, criticalFindings, limitations);
 }

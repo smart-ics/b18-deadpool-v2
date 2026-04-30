@@ -14,13 +14,15 @@ public record DashboardSnapshot
     public ChainInitializationStatusSummary ChainInitializationStatus { get; init; }
     public List<RecentJobSummary> RecentJobs { get; init; }
     public StorageStatusSummary StorageStatus { get; init; }
+    public DatabasePulseStatus? DatabasePulseStatus { get; init; }
 
     public DashboardSnapshot(
         string databaseName,
         LastBackupStatus lastBackupStatus,
         ChainInitializationStatusSummary chainInitializationStatus,
         List<RecentJobSummary> recentJobs,
-        StorageStatusSummary storageStatus)
+        StorageStatusSummary storageStatus,
+        DatabasePulseStatus? databasePulseStatus = null)
     {
         SnapshotTime = DateTime.UtcNow;
         DatabaseName = databaseName;
@@ -28,6 +30,7 @@ public record DashboardSnapshot
         ChainInitializationStatus = chainInitializationStatus;
         RecentJobs = recentJobs;
         StorageStatus = storageStatus;
+        DatabasePulseStatus = databasePulseStatus;
     }
 }
 

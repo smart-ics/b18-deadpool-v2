@@ -8,21 +8,28 @@ namespace Deadpool.Core.Services;
 
 /// <summary>
 /// Aggregates monitoring data for operational dashboard.
+/// Reads pre-computed health checks written by the Agent — UI is read-only.
 /// </summary>
 public class DashboardMonitoringService : IDashboardMonitoringService
 {
     private readonly IBackupJobRepository _backupJobRepository;
-    private readonly IStorageMonitoringService _storageMonitoringService;
+    private readonly IBackupHealthCheckRepository _backupHealthCheckRepository;
+    private readonly IStorageHealthCheckRepository _storageHealthCheckRepository;
+    private readonly IDatabasePulseRepository _databasePulseRepository;
     private readonly ILogger<DashboardMonitoringService> _logger;
     private const int RecentJobCount = 20;
 
     public DashboardMonitoringService(
         IBackupJobRepository backupJobRepository,
-        IStorageMonitoringService storageMonitoringService,
+        IBackupHealthCheckRepository backupHealthCheckRepository,
+        IStorageHealthCheckRepository storageHealthCheckRepository,
+        IDatabasePulseRepository databasePulseRepository,
         ILogger<DashboardMonitoringService> logger)
     {
         _backupJobRepository = backupJobRepository ?? throw new ArgumentNullException(nameof(backupJobRepository));
-        _storageMonitoringService = storageMonitoringService ?? throw new ArgumentNullException(nameof(storageMonitoringService));
+        _backupHealthCheckRepository = backupHealthCheckRepository ?? throw new ArgumentNullException(nameof(backupHealthCheckRepository));
+        _storageHealthCheckRepository = storageHealthCheckRepository ?? throw new ArgumentNullException(nameof(storageHealthCheckRepository));
+        _databasePulseRepository = databasePulseRepository ?? throw new ArgumentNullException(nameof(databasePulseRepository));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -32,13 +39,15 @@ public class DashboardMonitoringService : IDashboardMonitoringService
         var chainInitializationStatus = await BuildChainInitializationStatusAsync(databaseName);
         var recentJobs = await BuildRecentJobsAsync(databaseName);
         var storageStatus = await BuildStorageStatusAsync(backupVolumePath);
+        var pulseStatus = await BuildDatabasePulseStatusAsync();
 
         return new DashboardSnapshot(
             databaseName,
             lastBackupStatus,
             chainInitializationStatus,
             recentJobs,
-            storageStatus);
+            storageStatus,
+            pulseStatus);
     }
 
     private async Task<ChainInitializationStatusSummary> BuildChainInitializationStatusAsync(string databaseName)
@@ -77,79 +86,49 @@ public class DashboardMonitoringService : IDashboardMonitoringService
 
     private async Task<LastBackupStatus> BuildLastBackupStatusAsync(string databaseName)
     {
-        var lastFull = await _backupJobRepository.GetLastSuccessfulBackupAsync(databaseName, BackupType.Full);
-        var lastDiff = await _backupJobRepository.GetLastSuccessfulBackupAsync(databaseName, BackupType.Differential);
-        var lastLog = await _backupJobRepository.GetLastSuccessfulBackupAsync(databaseName, BackupType.TransactionLog);
-        var lastFailed = await _backupJobRepository.GetLastFailedBackupAsync(databaseName);
-
-        var warnings = new List<string>();
-        var criticalIssues = new List<string>();
-        var overallHealth = HealthStatus.Healthy;
-        var chainHealthSummary = "Unknown";
-
-        // Check Full backup
-        if (lastFull == null)
+        try
         {
-            criticalIssues.Add("No Full backup found");
-            overallHealth = HealthStatus.Critical;
-            chainHealthSummary = "Broken - No Full backup";
+            var healthCheck = await _backupHealthCheckRepository.GetLatestHealthCheckAsync(databaseName);
+
+            if (healthCheck == null)
+            {
+                return new LastBackupStatus
+                {
+                    OverallHealth = HealthStatus.Warning,
+                    Warnings = new List<string> { "No backup health data available — is the Agent running?" },
+                    ChainHealthSummary = "No data"
+                };
+            }
+
+            var chainSummary = healthCheck.OverallHealth switch
+            {
+                HealthStatus.Healthy => "Healthy",
+                HealthStatus.Warning => "Warning",
+                HealthStatus.Critical => "Critical",
+                _ => "Unknown"
+            };
+
+            return new LastBackupStatus
+            {
+                LastFullBackup = healthCheck.LastSuccessfulFullBackup,
+                LastDifferentialBackup = healthCheck.LastSuccessfulDifferentialBackup,
+                LastLogBackup = healthCheck.LastSuccessfulLogBackup,
+                OverallHealth = healthCheck.OverallHealth,
+                Warnings = healthCheck.Warnings.ToList(),
+                CriticalIssues = healthCheck.CriticalFindings.ToList(),
+                ChainHealthSummary = chainSummary
+            };
         }
-        else
+        catch (Exception ex)
         {
-            var fullAge = DateTime.UtcNow - lastFull.EndTime!.Value;
-            if (fullAge.TotalHours > 72)
+            _logger.LogError(ex, "Failed to build last backup status for database '{DatabaseName}'.", databaseName);
+            return new LastBackupStatus
             {
-                criticalIssues.Add($"Full backup is {fullAge.TotalHours:F0} hours old (>72h)");
-                overallHealth = HealthStatus.Critical;
-                chainHealthSummary = "Critical - Full backup overdue";
-            }
-            else if (fullAge.TotalHours > 48)
-            {
-                warnings.Add($"Full backup is {fullAge.TotalHours:F0} hours old (>48h)");
-                if (overallHealth == HealthStatus.Healthy)
-                    overallHealth = HealthStatus.Warning;
-                chainHealthSummary = "Warning - Full backup aging";
-            }
-            else
-            {
-                chainHealthSummary = "Healthy";
-            }
+                OverallHealth = HealthStatus.Warning,
+                Warnings = new List<string> { "Failed to read backup health data" },
+                ChainHealthSummary = "Unknown"
+            };
         }
-
-        // Check Log backup
-        if (lastLog != null)
-        {
-            var logAge = DateTime.UtcNow - lastLog.EndTime!.Value;
-            if (logAge.TotalMinutes > 60)
-            {
-                warnings.Add($"Log backup is {logAge.TotalMinutes:F0} minutes old (>60m)");
-                if (overallHealth == HealthStatus.Healthy)
-                    overallHealth = HealthStatus.Warning;
-            }
-        }
-
-        // Check recent failures
-        if (lastFailed != null)
-        {
-            var failureAge = DateTime.UtcNow - lastFailed.StartTime;
-            if (failureAge.TotalHours < 24)
-            {
-                warnings.Add($"Recent failure: {lastFailed.ErrorMessage ?? "Unknown error"}");
-                if (overallHealth == HealthStatus.Healthy)
-                    overallHealth = HealthStatus.Warning;
-            }
-        }
-
-        return new LastBackupStatus
-        {
-            LastFullBackup = lastFull?.EndTime,
-            LastDifferentialBackup = lastDiff?.EndTime,
-            LastLogBackup = lastLog?.EndTime,
-            OverallHealth = overallHealth,
-            Warnings = warnings,
-            CriticalIssues = criticalIssues,
-            ChainHealthSummary = chainHealthSummary
-        };
     }
 
     private async Task<List<RecentJobSummary>> BuildRecentJobsAsync(string databaseName)
@@ -169,15 +148,52 @@ public class DashboardMonitoringService : IDashboardMonitoringService
 
     private async Task<StorageStatusSummary> BuildStorageStatusAsync(string backupVolumePath)
     {
-        var storageHealth = await _storageMonitoringService.CheckStorageHealthAsync(backupVolumePath);
+        try
+        {
+            var healthCheck = await _storageHealthCheckRepository.GetLatestHealthCheckAsync(backupVolumePath);
 
-        return new StorageStatusSummary(
-            storageHealth.VolumePath,
-            storageHealth.TotalBytes,
-            storageHealth.FreeBytes,
-            storageHealth.FreePercentage,
-            storageHealth.OverallHealth,
-            storageHealth.Warnings.ToList(),
-            storageHealth.CriticalFindings.ToList());
+            if (healthCheck == null)
+            {
+                return new StorageStatusSummary(
+                    backupVolumePath, 0L, 0L, 0m,
+                    HealthStatus.Warning,
+                    new List<string> { "No storage health data available — is the Agent running?" },
+                    new List<string>());
+            }
+
+            return new StorageStatusSummary(
+                healthCheck.VolumePath,
+                healthCheck.TotalBytes,
+                healthCheck.FreeBytes,
+                healthCheck.FreePercentage,
+                healthCheck.OverallHealth,
+                healthCheck.Warnings.ToList(),
+                healthCheck.CriticalFindings.ToList());
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to build storage status for volume '{VolumePath}'.", backupVolumePath);
+            return new StorageStatusSummary(
+                backupVolumePath, 0L, 0L, 0m,
+                HealthStatus.Warning,
+                new List<string> { "Failed to read storage health data" },
+                new List<string>());
+        }
+    }
+
+    private async Task<DatabasePulseStatus?> BuildDatabasePulseStatusAsync()
+    {
+        try
+        {
+            var record = await _databasePulseRepository.GetLatestAsync();
+            if (record == null) return null;
+
+            return new DatabasePulseStatus(record.Status, record.CheckTime, record.ErrorMessage);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to read database pulse status.");
+            return null;
+        }
     }
 }
