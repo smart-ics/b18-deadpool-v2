@@ -62,6 +62,7 @@ _ReSharper*/
 # Application-specific
 appsettings.Development.json
 appsettings.Local.json
+# secrets.json
 *.log
 logs/
 backup-data/

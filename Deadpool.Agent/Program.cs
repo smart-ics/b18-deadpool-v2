@@ -35,7 +35,7 @@ var rootDir = current.FullName;
 var configuration = new ConfigurationBuilder()
     .SetBasePath(rootDir)
     .AddJsonFile("appsettings.shared.json", optional: false, reloadOnChange: true)
-    .AddJsonFile(Path.Combine(baseDir, "appsettings.json"), optional: true, reloadOnChange: true)
+    .AddJsonFile("secrets.json", optional: true, reloadOnChange: true)
     .Build();
 
 builder.Configuration.AddConfiguration(configuration);

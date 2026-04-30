@@ -39,7 +39,7 @@ static class Program
         var configuration = new ConfigurationBuilder()
             .SetBasePath(rootDir)
             .AddJsonFile("appsettings.shared.json", optional: false, reloadOnChange: true)
-            .AddJsonFile(Path.Combine(baseDir, "appsettings.json"), optional: true, reloadOnChange: true)
+            .AddJsonFile("secrets.json", optional: true, reloadOnChange: true)
             .Build();
 
         // Build service collection (pragmatic WinForms DI setup)
