@@ -1,5 +1,6 @@
 using Deadpool.Core.Interfaces;
 using Deadpool.Core.Services;
+using Deadpool.Core.Configuration;
 using Deadpool.Infrastructure.Persistence;
 using Deadpool.UI.Configuration;
 using Microsoft.Extensions.Configuration;
@@ -48,10 +49,15 @@ static class Program
 
         // Load dashboard settings
         var dashboardOptions = configuration.GetSection("Dashboard").Get<DashboardOptions>() ?? new DashboardOptions();
+        var backupStorageOptions = configuration.GetSection("BackupStorage").Get<BackupStorageOptions>()
+            ?? new BackupStorageOptions();
         var policyOptions = configuration.GetSection("BackupPolicies").Get<List<DatabaseBackupPolicyOptions>>()
             ?? new List<DatabaseBackupPolicyOptions>();
-        var selectedPolicy = policyOptions.FirstOrDefault(x =>
-            string.Equals(x.DatabaseName, dashboardOptions.DatabaseName, StringComparison.OrdinalIgnoreCase));
+        var selectedPolicy = policyOptions.FirstOrDefault();
+        if (selectedPolicy == null)
+        {
+            throw new InvalidOperationException("BackupPolicies must contain at least one policy for the dashboard.");
+        }
 
         // Launch dashboard
         var dashboardService = serviceProvider.GetRequiredService<IDashboardMonitoringService>();
@@ -60,8 +66,8 @@ static class Program
             dashboardService,
             policyFormatter,
             serviceProvider.GetRequiredService<ILogger<MonitoringDashboard>>(),
-            dashboardOptions.DatabaseName,
-            dashboardOptions.BackupVolumePath,
+            selectedPolicy.DatabaseName,
+            backupStorageOptions.StorageFolder,
             dashboardOptions.AutoRefreshIntervalSeconds,
             selectedPolicy);
 

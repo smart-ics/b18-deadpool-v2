@@ -1,4 +1,5 @@
 using Deadpool.Agent.Configuration;
+using Deadpool.Core.Configuration;
 using Deadpool.Agent.Infrastructure;
 using Deadpool.Agent.Workers;
 using Deadpool.Core.Domain.ValueObjects;
@@ -50,6 +51,10 @@ builder.Services.Configure<ExecutionWorkerOptions>(
 // Backup copy configuration
 builder.Services.Configure<BackupCopyOptions>(
     builder.Configuration.GetSection("BackupCopy"));
+
+// Shared backup storage configuration
+builder.Services.Configure<BackupStorageOptions>(
+    builder.Configuration.GetSection("BackupStorage"));
 
 // Health monitoring configuration
 builder.Services.Configure<HealthMonitoringOptions>(
@@ -156,6 +161,8 @@ builder.Services.AddSingleton<IStorageMonitoringService>(sp =>
 
 // Backup file copy service (conditional registration based on configuration)
 var copyOptions = builder.Configuration.GetSection("BackupCopy").Get<BackupCopyOptions>();
+var backupStorageOptions = builder.Configuration.GetSection("BackupStorage").Get<BackupStorageOptions>()
+    ?? new BackupStorageOptions();
 if (copyOptions?.Enabled == true)
 {
     builder.Services.AddSingleton<IBackupFileCopyService>(sp =>
@@ -163,7 +170,7 @@ if (copyOptions?.Enabled == true)
         var logger = sp.GetRequiredService<ILogger<BackupFileCopyService>>();
         return new BackupFileCopyService(
             logger,
-            copyOptions.RemoteStoragePath,
+            backupStorageOptions.StorageFolder,
             copyOptions.MaxRetryAttempts,
             copyOptions.RetryDelay);
     });
@@ -171,7 +178,7 @@ if (copyOptions?.Enabled == true)
 
 // BackupFilePathService
 builder.Services.AddSingleton<BackupFilePathService>(sp =>
-    new BackupFilePathService("C:\\Backups")); // TODO: Move to configuration
+    new BackupFilePathService(backupStorageOptions.StagingFolder));
 
 // BackupService (still used by existing code, but execution worker uses IBackupExecutor directly)
 builder.Services.AddSingleton<BackupService>();
