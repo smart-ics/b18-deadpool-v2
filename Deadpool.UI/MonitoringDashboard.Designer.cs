@@ -30,579 +30,884 @@ namespace Deadpool.UI
         /// </summary>
         private void InitializeComponent()
         {
-            this.panelHeader = new System.Windows.Forms.Panel();
-            this.lblTitle = new System.Windows.Forms.Label();
-            this.lblLastRefresh = new System.Windows.Forms.Label();
-            this.btnRefresh = new System.Windows.Forms.Button();
-            this.btnJobMonitor = new System.Windows.Forms.Button();
-            this.panelLastBackupStatus = new System.Windows.Forms.Panel();
-            this.lblLastBackupTitle = new System.Windows.Forms.Label();
-            this.lblFullBackup = new System.Windows.Forms.Label();
-            this.lblDiffBackup = new System.Windows.Forms.Label();
-            this.lblLogBackup = new System.Windows.Forms.Label();
-            this.lblChainHealth = new System.Windows.Forms.Label();
-            this.lstWarnings = new System.Windows.Forms.ListBox();
-            this.panelRecentJobs = new System.Windows.Forms.Panel();
-            this.lblRecentJobsTitle = new System.Windows.Forms.Label();
-            this.dgvRecentJobs = new System.Windows.Forms.DataGridView();
-            this.panelStorageStatus = new System.Windows.Forms.Panel();
-            this.lblStorageTitle = new System.Windows.Forms.Label();
-            this.lblStoragePath = new System.Windows.Forms.Label();
-            this.lblStorageSpace = new System.Windows.Forms.Label();
-            this.lblStorageHealth = new System.Windows.Forms.Label();
-            this.progressBarStorage = new System.Windows.Forms.ProgressBar();
-            this.panelBackupPolicy = new System.Windows.Forms.Panel();
-            this.lblPolicyTitle = new System.Windows.Forms.Label();
-            this.lblPolicyFullSchedule = new System.Windows.Forms.Label();
-            this.lblPolicyDifferentialSchedule = new System.Windows.Forms.Label();
-            this.lblPolicyLogSchedule = new System.Windows.Forms.Label();
-            this.lblPolicyRecoveryModel = new System.Windows.Forms.Label();
-            this.lblPolicyRetention = new System.Windows.Forms.Label();
-            this.lblPolicyBootstrap = new System.Windows.Forms.Label();
-            this.panelDatabaseTopology = new System.Windows.Forms.Panel();
-            this.lblDatabaseTopologyTitle = new System.Windows.Forms.Label();
-            this.lblDbName = new System.Windows.Forms.Label();
-            this.lblDbServer = new System.Windows.Forms.Label();
-            this.lblDbRecoveryModel = new System.Windows.Forms.Label();
-            this.lblTopologyProdServer = new System.Windows.Forms.Label();
-            this.lblTopologyBackupServer = new System.Windows.Forms.Label();
-            this.lblTopologyDestinationPath = new System.Windows.Forms.Label();
-            this.lblPulseStatus = new System.Windows.Forms.Label();
-            this.lblPulseLastChecked = new System.Windows.Forms.Label();
-            this.lblChainInitialized = new System.Windows.Forms.Label();
-            this.lblLastValidFullBackup = new System.Windows.Forms.Label();
-            this.lblRestoreChainHealthSimple = new System.Windows.Forms.Label();
-            this.lblChainInitializationWarning = new System.Windows.Forms.Label();
-            this.panelHeader.SuspendLayout();
-            this.panelLastBackupStatus.SuspendLayout();
-            this.panelRecentJobs.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.dgvRecentJobs)).BeginInit();
-            this.panelStorageStatus.SuspendLayout();
-            this.panelBackupPolicy.SuspendLayout();
-            this.panelDatabaseTopology.SuspendLayout();
-            this.SuspendLayout();
+            panelHeader = new Panel();
+            lblTitle = new Label();
+            lblSystemStatus = new Label();
+            lblDbSummary = new Label();
+            lblNextRisk = new Label();
+            lblLastRefresh = new Label();
+            btnJobMonitor = new Button();
+            btnRefresh = new Button();
+            tableBody = new TableLayoutPanel();
+            tableLeftCards = new TableLayoutPanel();
+            tableMainBottom = new TableLayoutPanel();
+            panelLastBackupStatus = new Panel();
+            lblLastBackupTitle = new Label();
+            lblFullBackup = new Label();
+            lblDiffBackup = new Label();
+            lblLogBackup = new Label();
+            panelChainHealthCard = new Panel();
+            lblChainHealthTitle = new Label();
+            lblChainHealth = new Label();
+            lblChainMessage = new Label();
+            lblChainAction = new Label();
+            panelStorageStatus = new Panel();
+            lblStorageTitle = new Label();
+            lblStoragePath = new Label();
+            lblStorageSpace = new Label();
+            lblEstimatedFullBackup = new Label();
+            lblStoragePrediction = new Label();
+            progressBarStorage = new ProgressBar();
+            panelDatabaseCard = new Panel();
+            lblDatabaseCardTitle = new Label();
+            lblDatabaseStatus = new Label();
+            panelAlert = new Panel();
+            lblAlertTitle = new Label();
+            lblAlertMessage = new Label();
+            lblAlertAction = new Label();
+            panelRecentJobs = new Panel();
+            lblRecentJobsTitle = new Label();
+            dgvRecentJobs = new DataGridView();
+            panelDetails = new Panel();
+            tableDetails = new TableLayoutPanel();
+            panelBackupPolicy = new Panel();
+            lblPolicyTitle = new Label();
+            lblPolicyFullSchedule = new Label();
+            lblPolicyDifferentialSchedule = new Label();
+            lblPolicyLogSchedule = new Label();
+            lblPolicyRecoveryModel = new Label();
+            lblPolicyRetention = new Label();
+            lblPolicyBootstrap = new Label();
+            panelDatabaseTopology = new Panel();
+            lblDatabaseTopologyTitle = new Label();
+            lblDbName = new Label();
+            lblDbServer = new Label();
+            lblDbRecoveryModel = new Label();
+            lblTopologyProdServer = new Label();
+            lblTopologyBackupServer = new Label();
+            lblTopologyDestinationPath = new Label();
+            lblPulseStatus = new Label();
+            lblPulseLastChecked = new Label();
+            lblChainInitialized = new Label();
+            lblLastValidFullBackup = new Label();
+            lblRestoreChainHealthSimple = new Label();
+            lblChainInitializationWarning = new Label();
+            panelHeader.SuspendLayout();
+            tableBody.SuspendLayout();
+            tableLeftCards.SuspendLayout();
+            tableMainBottom.SuspendLayout();
+            panelLastBackupStatus.SuspendLayout();
+            panelChainHealthCard.SuspendLayout();
+            panelStorageStatus.SuspendLayout();
+            panelDatabaseCard.SuspendLayout();
+            panelAlert.SuspendLayout();
+            panelRecentJobs.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)dgvRecentJobs).BeginInit();
+            panelDetails.SuspendLayout();
+            tableDetails.SuspendLayout();
+            panelBackupPolicy.SuspendLayout();
+            panelDatabaseTopology.SuspendLayout();
+            SuspendLayout();
             // 
             // panelHeader
             // 
-            this.panelHeader.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(45)))), ((int)(((byte)(45)))), ((int)(((byte)(48)))));
-            this.panelHeader.Controls.Add(this.lblTitle);
-            this.panelHeader.Controls.Add(this.lblLastRefresh);
-            this.panelHeader.Controls.Add(this.btnRefresh);
-            this.panelHeader.Controls.Add(this.btnJobMonitor);
-            this.panelHeader.Dock = System.Windows.Forms.DockStyle.Top;
-            this.panelHeader.Location = new System.Drawing.Point(0, 0);
-            this.panelHeader.Name = "panelHeader";
-            this.panelHeader.Size = new System.Drawing.Size(1200, 60);
-            this.panelHeader.TabIndex = 0;
+            panelHeader.BackColor = Color.FromArgb(27, 44, 67);
+            panelHeader.Controls.Add(lblSystemStatus);
+            panelHeader.Controls.Add(lblDbSummary);
+            panelHeader.Controls.Add(lblNextRisk);
+            panelHeader.Controls.Add(lblLastRefresh);
+            panelHeader.Controls.Add(btnJobMonitor);
+            panelHeader.Controls.Add(btnRefresh);
+            panelHeader.Dock = DockStyle.Top;
+            panelHeader.Location = new Point(0, 0);
+            panelHeader.Name = "panelHeader";
+            panelHeader.Size = new Size(1480, 52);
+            panelHeader.TabIndex = 0;
             // 
             // lblTitle
             // 
-            this.lblTitle.AutoSize = true;
-            this.lblTitle.Font = new System.Drawing.Font("Segoe UI", 16F, System.Drawing.FontStyle.Bold);
-            this.lblTitle.ForeColor = System.Drawing.Color.White;
-            this.lblTitle.Location = new System.Drawing.Point(12, 15);
-            this.lblTitle.Name = "lblTitle";
-            this.lblTitle.Size = new System.Drawing.Size(310, 30);
-            this.lblTitle.TabIndex = 0;
-            this.lblTitle.Text = "Backup Monitoring Dashboard";
+            lblTitle.AutoSize = true;
+            lblTitle.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            lblTitle.ForeColor = Color.White;
+            lblTitle.Location = new Point(12, 16);
+            lblTitle.Name = "lblTitle";
+            lblTitle.Size = new Size(91, 19);
+            lblTitle.TabIndex = 0;
+            lblTitle.Text = "Deadpool";
+            lblTitle.Visible = false;
+            // 
+            // lblSystemStatus
+            // 
+            lblSystemStatus.AutoSize = true;
+            lblSystemStatus.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
+            lblSystemStatus.ForeColor = Color.FromArgb(255, 199, 44);
+            lblSystemStatus.Location = new Point(12, 15);
+            lblSystemStatus.Name = "lblSystemStatus";
+            lblSystemStatus.Size = new Size(108, 21);
+            lblSystemStatus.TabIndex = 1;
+            lblSystemStatus.Text = "X CRITICAL";
+            // 
+            // lblDbSummary
+            // 
+            lblDbSummary.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            lblDbSummary.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            lblDbSummary.ForeColor = Color.FromArgb(224, 233, 245);
+            lblDbSummary.Location = new Point(780, 18);
+            lblDbSummary.Name = "lblDbSummary";
+            lblDbSummary.Size = new Size(308, 16);
+            lblDbSummary.TabIndex = 2;
+            lblDbSummary.Text = "Next Backup: FULL Sun 00:00 | DIFF 01:00 | LOG +12m";
+            lblDbSummary.TextAlign = ContentAlignment.MiddleRight;
+            // 
+            // lblNextRisk
+            // 
+            lblNextRisk.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            lblNextRisk.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            lblNextRisk.ForeColor = Color.FromArgb(255, 219, 153);
+            lblNextRisk.Location = new Point(168, 16);
+            lblNextRisk.Name = "lblNextRisk";
+            lblNextRisk.Size = new Size(606, 20);
+            lblNextRisk.TabIndex = 3;
+            lblNextRisk.Text = "Storage will fail";
             // 
             // lblLastRefresh
             // 
-            this.lblLastRefresh.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            this.lblLastRefresh.ForeColor = System.Drawing.Color.LightGray;
-            this.lblLastRefresh.Location = new System.Drawing.Point(850, 20);
-            this.lblLastRefresh.Name = "lblLastRefresh";
-            this.lblLastRefresh.Size = new System.Drawing.Size(220, 20);
-            this.lblLastRefresh.TabIndex = 1;
-            this.lblLastRefresh.Text = "Last refresh: --";
-            this.lblLastRefresh.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
-            // 
-            // btnRefresh
-            // 
-            this.btnRefresh.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnRefresh.Location = new System.Drawing.Point(1080, 15);
-            this.btnRefresh.Name = "btnRefresh";
-            this.btnRefresh.Size = new System.Drawing.Size(100, 30);
-            this.btnRefresh.TabIndex = 2;
-            this.btnRefresh.Text = "Refresh";
-            this.btnRefresh.UseVisualStyleBackColor = true;
-            this.btnRefresh.Click += new System.EventHandler(this.btnRefresh_Click);
+            lblLastRefresh.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            lblLastRefresh.ForeColor = Color.FromArgb(214, 220, 230);
+            lblLastRefresh.Location = new Point(1092, 3);
+            lblLastRefresh.Name = "lblLastRefresh";
+            lblLastRefresh.Size = new Size(278, 14);
+            lblLastRefresh.TabIndex = 4;
+            lblLastRefresh.Text = "Last refresh: --";
+            lblLastRefresh.TextAlign = ContentAlignment.MiddleRight;
             // 
             // btnJobMonitor
             // 
-            this.btnJobMonitor.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnJobMonitor.Location = new System.Drawing.Point(950, 15);
-            this.btnJobMonitor.Name = "btnJobMonitor";
-            this.btnJobMonitor.Size = new System.Drawing.Size(120, 30);
-            this.btnJobMonitor.TabIndex = 3;
-            this.btnJobMonitor.Text = "Job Monitor";
-            this.btnJobMonitor.UseVisualStyleBackColor = true;
-            this.btnJobMonitor.Click += new System.EventHandler(this.btnJobMonitor_Click);
+            btnJobMonitor.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btnJobMonitor.BackColor = Color.FromArgb(58, 85, 117);
+            btnJobMonitor.FlatStyle = FlatStyle.Flat;
+            btnJobMonitor.ForeColor = Color.White;
+            btnJobMonitor.Location = new Point(1092, 19);
+            btnJobMonitor.Name = "btnJobMonitor";
+            btnJobMonitor.Size = new Size(138, 28);
+            btnJobMonitor.TabIndex = 5;
+            btnJobMonitor.Text = "Job Monitor";
+            btnJobMonitor.UseVisualStyleBackColor = false;
+            btnJobMonitor.Click += btnJobMonitor_Click;
+            // 
+            // btnRefresh
+            // 
+            btnRefresh.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btnRefresh.BackColor = Color.FromArgb(17, 125, 187);
+            btnRefresh.FlatStyle = FlatStyle.Flat;
+            btnRefresh.ForeColor = Color.White;
+            btnRefresh.Location = new Point(1236, 19);
+            btnRefresh.Name = "btnRefresh";
+            btnRefresh.Size = new Size(108, 28);
+            btnRefresh.TabIndex = 6;
+            btnRefresh.Text = "Refresh";
+            btnRefresh.UseVisualStyleBackColor = false;
+            btnRefresh.Click += btnRefresh_Click;
+            // 
+            // tableBody
+            // 
+            tableBody.ColumnCount = 1;
+            tableBody.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            tableBody.Controls.Add(tableLeftCards, 0, 0);
+            tableBody.Controls.Add(tableMainBottom, 0, 1);
+            tableBody.Dock = DockStyle.Fill;
+            tableBody.Location = new Point(0, 52);
+            tableBody.Name = "tableBody";
+            tableBody.Padding = new Padding(8, 6, 8, 8);
+            tableBody.RowCount = 2;
+            tableBody.RowStyles.Add(new RowStyle(SizeType.Absolute, 104F));
+            tableBody.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+            tableBody.Size = new Size(1480, 898);
+            tableBody.TabIndex = 1;
+            // 
+            // tableLeftCards
+            // 
+            tableLeftCards.ColumnCount = 4;
+            tableLeftCards.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25F));
+            tableLeftCards.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25F));
+            tableLeftCards.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25F));
+            tableLeftCards.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25F));
+            tableLeftCards.Controls.Add(panelLastBackupStatus, 0, 0);
+            tableLeftCards.Controls.Add(panelChainHealthCard, 1, 0);
+            tableLeftCards.Controls.Add(panelStorageStatus, 2, 0);
+            tableLeftCards.Controls.Add(panelDatabaseCard, 3, 0);
+            tableLeftCards.Dock = DockStyle.Fill;
+            tableLeftCards.Location = new Point(11, 9);
+            tableLeftCards.Name = "tableLeftCards";
+            tableLeftCards.RowCount = 1;
+            tableLeftCards.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+            tableLeftCards.Size = new Size(1458, 98);
+            tableLeftCards.TabIndex = 0;
+            // 
+            // tableMainBottom
+            // 
+            tableMainBottom.ColumnCount = 2;
+            tableMainBottom.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 73F));
+            tableMainBottom.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 27F));
+            tableMainBottom.Controls.Add(panelRecentJobs, 0, 0);
+            tableMainBottom.Controls.Add(panelAlert, 1, 0);
+            tableMainBottom.Dock = DockStyle.Fill;
+            tableMainBottom.Location = new Point(11, 113);
+            tableMainBottom.Name = "tableMainBottom";
+            tableMainBottom.RowCount = 1;
+            tableMainBottom.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+            tableMainBottom.Size = new Size(1458, 776);
+            tableMainBottom.TabIndex = 1;
             // 
             // panelLastBackupStatus
             // 
-            this.panelLastBackupStatus.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            this.panelLastBackupStatus.Controls.Add(this.lblLastBackupTitle);
-            this.panelLastBackupStatus.Controls.Add(this.lblFullBackup);
-            this.panelLastBackupStatus.Controls.Add(this.lblDiffBackup);
-            this.panelLastBackupStatus.Controls.Add(this.lblLogBackup);
-            this.panelLastBackupStatus.Controls.Add(this.lblChainHealth);
-            this.panelLastBackupStatus.Controls.Add(this.lstWarnings);
-            this.panelLastBackupStatus.Location = new System.Drawing.Point(12, 70);
-            this.panelLastBackupStatus.Name = "panelLastBackupStatus";
-            this.panelLastBackupStatus.Size = new System.Drawing.Size(380, 250);
-            this.panelLastBackupStatus.TabIndex = 1;
+            panelLastBackupStatus.BackColor = Color.White;
+            panelLastBackupStatus.BorderStyle = BorderStyle.FixedSingle;
+            panelLastBackupStatus.Controls.Add(lblLastBackupTitle);
+            panelLastBackupStatus.Controls.Add(lblFullBackup);
+            panelLastBackupStatus.Controls.Add(lblDiffBackup);
+            panelLastBackupStatus.Controls.Add(lblLogBackup);
+            panelLastBackupStatus.Dock = DockStyle.Fill;
+            panelLastBackupStatus.Location = new Point(2, 2);
+            panelLastBackupStatus.Name = "panelLastBackupStatus";
+            panelLastBackupStatus.Padding = new Padding(8, 6, 8, 6);
+            panelLastBackupStatus.Size = new Size(360, 94);
+            panelLastBackupStatus.TabIndex = 0;
             // 
             // lblLastBackupTitle
             // 
-            this.lblLastBackupTitle.AutoSize = true;
-            this.lblLastBackupTitle.Font = new System.Drawing.Font("Segoe UI", 11F, System.Drawing.FontStyle.Bold);
-            this.lblLastBackupTitle.Location = new System.Drawing.Point(10, 10);
-            this.lblLastBackupTitle.Name = "lblLastBackupTitle";
-            this.lblLastBackupTitle.Size = new System.Drawing.Size(141, 20);
-            this.lblLastBackupTitle.TabIndex = 0;
-            this.lblLastBackupTitle.Text = "Last Backup Status";
+            lblLastBackupTitle.AutoSize = true;
+            lblLastBackupTitle.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            lblLastBackupTitle.Location = new Point(8, 6);
+            lblLastBackupTitle.Name = "lblLastBackupTitle";
+            lblLastBackupTitle.Size = new Size(88, 19);
+            lblLastBackupTitle.TabIndex = 0;
+            lblLastBackupTitle.Text = "Last Backup";
             // 
             // lblFullBackup
             // 
-            this.lblFullBackup.AutoSize = true;
-            this.lblFullBackup.Location = new System.Drawing.Point(10, 40);
-            this.lblFullBackup.Name = "lblFullBackup";
-            this.lblFullBackup.Size = new System.Drawing.Size(100, 15);
-            this.lblFullBackup.TabIndex = 1;
-            this.lblFullBackup.Text = "Full: --";
+            lblFullBackup.AutoSize = true;
+            lblFullBackup.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
+            lblFullBackup.Location = new Point(8, 27);
+            lblFullBackup.Name = "lblFullBackup";
+            lblFullBackup.Size = new Size(96, 17);
+            lblFullBackup.TabIndex = 1;
+            lblFullBackup.Text = "FULL  Unknown";
             // 
             // lblDiffBackup
             // 
-            this.lblDiffBackup.AutoSize = true;
-            this.lblDiffBackup.Location = new System.Drawing.Point(10, 60);
-            this.lblDiffBackup.Name = "lblDiffBackup";
-            this.lblDiffBackup.Size = new System.Drawing.Size(100, 15);
-            this.lblDiffBackup.TabIndex = 2;
-            this.lblDiffBackup.Text = "Differential: --";
+            lblDiffBackup.AutoSize = true;
+            lblDiffBackup.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
+            lblDiffBackup.Location = new Point(8, 48);
+            lblDiffBackup.Name = "lblDiffBackup";
+            lblDiffBackup.Size = new Size(95, 17);
+            lblDiffBackup.TabIndex = 2;
+            lblDiffBackup.Text = "DIFF  Unknown";
             // 
             // lblLogBackup
             // 
-            this.lblLogBackup.AutoSize = true;
-            this.lblLogBackup.Location = new System.Drawing.Point(10, 80);
-            this.lblLogBackup.Name = "lblLogBackup";
-            this.lblLogBackup.Size = new System.Drawing.Size(100, 15);
-            this.lblLogBackup.TabIndex = 3;
-            this.lblLogBackup.Text = "Log: --";
+            lblLogBackup.AutoSize = true;
+            lblLogBackup.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
+            lblLogBackup.Location = new Point(8, 69);
+            lblLogBackup.Name = "lblLogBackup";
+            lblLogBackup.Size = new Size(90, 17);
+            lblLogBackup.TabIndex = 3;
+            lblLogBackup.Text = "LOG   Unknown";
+            // 
+            // panelChainHealthCard
+            // 
+            panelChainHealthCard.BackColor = Color.White;
+            panelChainHealthCard.BorderStyle = BorderStyle.FixedSingle;
+            panelChainHealthCard.Controls.Add(lblChainHealthTitle);
+            panelChainHealthCard.Controls.Add(lblChainHealth);
+            panelChainHealthCard.Controls.Add(lblChainMessage);
+            panelChainHealthCard.Controls.Add(lblChainAction);
+            panelChainHealthCard.Dock = DockStyle.Fill;
+            panelChainHealthCard.Location = new Point(366, 2);
+            panelChainHealthCard.Name = "panelChainHealthCard";
+            panelChainHealthCard.Padding = new Padding(8, 6, 8, 6);
+            panelChainHealthCard.Size = new Size(360, 94);
+            panelChainHealthCard.TabIndex = 1;
+            // 
+            // lblChainHealthTitle
+            // 
+            lblChainHealthTitle.AutoSize = true;
+            lblChainHealthTitle.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            lblChainHealthTitle.Location = new Point(8, 6);
+            lblChainHealthTitle.Name = "lblChainHealthTitle";
+            lblChainHealthTitle.Size = new Size(95, 19);
+            lblChainHealthTitle.TabIndex = 0;
+            lblChainHealthTitle.Text = "Chain Health";
             // 
             // lblChainHealth
             // 
-            this.lblChainHealth.AutoSize = true;
-            this.lblChainHealth.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold);
-            this.lblChainHealth.Location = new System.Drawing.Point(10, 105);
-            this.lblChainHealth.Name = "lblChainHealth";
-            this.lblChainHealth.Size = new System.Drawing.Size(150, 19);
-            this.lblChainHealth.TabIndex = 4;
-            this.lblChainHealth.Text = "Chain Health: Unknown";
+            lblChainHealth.AutoSize = true;
+            lblChainHealth.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
+            lblChainHealth.Location = new Point(8, 27);
+            lblChainHealth.Name = "lblChainHealth";
+            lblChainHealth.Size = new Size(81, 20);
+            lblChainHealth.TabIndex = 1;
+            lblChainHealth.Text = "UNKNOWN";
             // 
-            // lstWarnings
+            // lblChainMessage
             // 
-            this.lstWarnings.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
-            | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.lstWarnings.FormattingEnabled = true;
-            this.lstWarnings.ItemHeight = 15;
-            this.lstWarnings.Location = new System.Drawing.Point(10, 135);
-            this.lstWarnings.Name = "lstWarnings";
-            this.lstWarnings.Size = new System.Drawing.Size(358, 154);
-            this.lstWarnings.TabIndex = 5;
+            lblChainMessage.Location = new Point(8, 47);
+            lblChainMessage.Name = "lblChainMessage";
+            lblChainMessage.Size = new Size(344, 18);
+            lblChainMessage.TabIndex = 2;
+            lblChainMessage.Text = "Waiting for chain health analysis";
             // 
-            // panelRecentJobs
+            // lblChainAction
             // 
-            this.panelRecentJobs.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
-            | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.panelRecentJobs.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            this.panelRecentJobs.Controls.Add(this.lblRecentJobsTitle);
-            this.panelRecentJobs.Controls.Add(this.dgvRecentJobs);
-            this.panelRecentJobs.Location = new System.Drawing.Point(400, 70);
-            this.panelRecentJobs.Name = "panelRecentJobs";
-            this.panelRecentJobs.Size = new System.Drawing.Size(788, 598);
-            this.panelRecentJobs.TabIndex = 2;
-            // 
-            // lblRecentJobsTitle
-            // 
-            this.lblRecentJobsTitle.AutoSize = true;
-            this.lblRecentJobsTitle.Font = new System.Drawing.Font("Segoe UI", 11F, System.Drawing.FontStyle.Bold);
-            this.lblRecentJobsTitle.Location = new System.Drawing.Point(10, 10);
-            this.lblRecentJobsTitle.Name = "lblRecentJobsTitle";
-            this.lblRecentJobsTitle.Size = new System.Drawing.Size(91, 20);
-            this.lblRecentJobsTitle.TabIndex = 0;
-            this.lblRecentJobsTitle.Text = "Recent Jobs";
-            // 
-            // dgvRecentJobs
-            // 
-            this.dgvRecentJobs.AllowUserToAddRows = false;
-            this.dgvRecentJobs.AllowUserToDeleteRows = false;
-            this.dgvRecentJobs.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
-            | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.dgvRecentJobs.AutoSizeColumnsMode = System.Windows.Forms.DataGridViewAutoSizeColumnsMode.AllCells;
-            this.dgvRecentJobs.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-            this.dgvRecentJobs.Location = new System.Drawing.Point(10, 40);
-            this.dgvRecentJobs.Name = "dgvRecentJobs";
-            this.dgvRecentJobs.ReadOnly = true;
-            this.dgvRecentJobs.RowHeadersVisible = false;
-            this.dgvRecentJobs.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
-            this.dgvRecentJobs.Size = new System.Drawing.Size(768, 546);
-            this.dgvRecentJobs.TabIndex = 1;
+            lblChainAction.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            lblChainAction.ForeColor = Color.FromArgb(48, 72, 97);
+            lblChainAction.Location = new Point(8, 65);
+            lblChainAction.Name = "lblChainAction";
+            lblChainAction.Size = new Size(344, 18);
+            lblChainAction.TabIndex = 3;
+            lblChainAction.Text = "Action: --";
             // 
             // panelStorageStatus
             // 
-            this.panelStorageStatus.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left)));
-            this.panelStorageStatus.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            this.panelStorageStatus.Controls.Add(this.lblStorageTitle);
-            this.panelStorageStatus.Controls.Add(this.lblStoragePath);
-            this.panelStorageStatus.Controls.Add(this.lblStorageSpace);
-            this.panelStorageStatus.Controls.Add(this.lblStorageHealth);
-            this.panelStorageStatus.Controls.Add(this.progressBarStorage);
-            this.panelStorageStatus.Location = new System.Drawing.Point(12, 830);
-            this.panelStorageStatus.Name = "panelStorageStatus";
-            this.panelStorageStatus.Size = new System.Drawing.Size(380, 148);
-            this.panelStorageStatus.TabIndex = 3;
+            panelStorageStatus.BackColor = Color.White;
+            panelStorageStatus.BorderStyle = BorderStyle.FixedSingle;
+            panelStorageStatus.Controls.Add(lblStorageTitle);
+            panelStorageStatus.Controls.Add(lblStoragePath);
+            panelStorageStatus.Controls.Add(lblStorageSpace);
+            panelStorageStatus.Controls.Add(lblEstimatedFullBackup);
+            panelStorageStatus.Controls.Add(lblStoragePrediction);
+            panelStorageStatus.Controls.Add(progressBarStorage);
+            panelStorageStatus.Dock = DockStyle.Fill;
+            panelStorageStatus.Location = new Point(730, 2);
+            panelStorageStatus.Name = "panelStorageStatus";
+            panelStorageStatus.Padding = new Padding(8, 6, 8, 6);
+            panelStorageStatus.Size = new Size(360, 94);
+            panelStorageStatus.TabIndex = 2;
             // 
             // lblStorageTitle
             // 
-            this.lblStorageTitle.AutoSize = true;
-            this.lblStorageTitle.Font = new System.Drawing.Font("Segoe UI", 11F, System.Drawing.FontStyle.Bold);
-            this.lblStorageTitle.Location = new System.Drawing.Point(10, 10);
-            this.lblStorageTitle.Name = "lblStorageTitle";
-            this.lblStorageTitle.Size = new System.Drawing.Size(109, 20);
-            this.lblStorageTitle.TabIndex = 0;
-            this.lblStorageTitle.Text = "Storage Status";
+            lblStorageTitle.AutoSize = true;
+            lblStorageTitle.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            lblStorageTitle.Location = new Point(8, 6);
+            lblStorageTitle.Name = "lblStorageTitle";
+            lblStorageTitle.Size = new Size(56, 19);
+            lblStorageTitle.TabIndex = 0;
+            lblStorageTitle.Text = "Storage";
             // 
             // lblStoragePath
             // 
-            this.lblStoragePath.AutoSize = true;
-            this.lblStoragePath.Location = new System.Drawing.Point(10, 40);
-            this.lblStoragePath.Name = "lblStoragePath";
-            this.lblStoragePath.Size = new System.Drawing.Size(100, 15);
-            this.lblStoragePath.TabIndex = 1;
-            this.lblStoragePath.Text = "Path: --";
+            lblStoragePath.Location = new Point(8, 25);
+            lblStoragePath.Name = "lblStoragePath";
+            lblStoragePath.Size = new Size(344, 15);
+            lblStoragePath.TabIndex = 1;
+            lblStoragePath.Text = "Volume: --";
             // 
             // lblStorageSpace
             // 
-            this.lblStorageSpace.AutoSize = true;
-            this.lblStorageSpace.Location = new System.Drawing.Point(10, 86);
-            this.lblStorageSpace.Name = "lblStorageSpace";
-            this.lblStorageSpace.Size = new System.Drawing.Size(150, 15);
-            this.lblStorageSpace.TabIndex = 2;
-            this.lblStorageSpace.Text = "Free: -- / -- (--%)";
+            lblStorageSpace.AutoSize = true;
+            lblStorageSpace.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            lblStorageSpace.Location = new Point(8, 42);
+            lblStorageSpace.Name = "lblStorageSpace";
+            lblStorageSpace.Size = new Size(88, 15);
+            lblStorageSpace.TabIndex = 2;
+            lblStorageSpace.Text = "Free: Unknown";
             // 
-            // lblStorageHealth
+            // lblEstimatedFullBackup
             // 
-            this.lblStorageHealth.AutoSize = true;
-            this.lblStorageHealth.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold);
-            this.lblStorageHealth.Location = new System.Drawing.Point(10, 112);
-            this.lblStorageHealth.Name = "lblStorageHealth";
-            this.lblStorageHealth.Size = new System.Drawing.Size(130, 19);
-            this.lblStorageHealth.TabIndex = 3;
-            this.lblStorageHealth.Text = "Health: Unknown";
+            lblEstimatedFullBackup.AutoSize = true;
+            lblEstimatedFullBackup.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            lblEstimatedFullBackup.Location = new Point(8, 57);
+            lblEstimatedFullBackup.Name = "lblEstimatedFullBackup";
+            lblEstimatedFullBackup.Size = new Size(107, 15);
+            lblEstimatedFullBackup.TabIndex = 3;
+            lblEstimatedFullBackup.Text = "Next FULL: -- GB";
+            // 
+            // lblStoragePrediction
+            // 
+            lblStoragePrediction.AutoSize = true;
+            lblStoragePrediction.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            lblStoragePrediction.Location = new Point(8, 72);
+            lblStoragePrediction.Name = "lblStoragePrediction";
+            lblStoragePrediction.Size = new Size(75, 19);
+            lblStoragePrediction.TabIndex = 4;
+            lblStoragePrediction.Text = "Status: --";
             // 
             // progressBarStorage
             // 
-            this.progressBarStorage.Location = new System.Drawing.Point(10, 60);
-            this.progressBarStorage.Name = "progressBarStorage";
-            this.progressBarStorage.Size = new System.Drawing.Size(358, 23);
-            this.progressBarStorage.TabIndex = 4;
+            progressBarStorage.Location = new Point(188, 74);
+            progressBarStorage.Name = "progressBarStorage";
+            progressBarStorage.Size = new Size(164, 10);
+            progressBarStorage.TabIndex = 5;
+            // 
+            // panelDatabaseCard
+            // 
+            panelDatabaseCard.BackColor = Color.White;
+            panelDatabaseCard.BorderStyle = BorderStyle.FixedSingle;
+            panelDatabaseCard.Controls.Add(lblDatabaseCardTitle);
+            panelDatabaseCard.Controls.Add(lblDatabaseStatus);
+            panelDatabaseCard.Dock = DockStyle.Fill;
+            panelDatabaseCard.Location = new Point(1094, 2);
+            panelDatabaseCard.Name = "panelDatabaseCard";
+            panelDatabaseCard.Padding = new Padding(8, 6, 8, 6);
+            panelDatabaseCard.Size = new Size(362, 94);
+            panelDatabaseCard.TabIndex = 3;
+            // 
+            // lblDatabaseCardTitle
+            // 
+            lblDatabaseCardTitle.AutoSize = true;
+            lblDatabaseCardTitle.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            lblDatabaseCardTitle.Location = new Point(8, 6);
+            lblDatabaseCardTitle.Name = "lblDatabaseCardTitle";
+            lblDatabaseCardTitle.Size = new Size(69, 19);
+            lblDatabaseCardTitle.TabIndex = 0;
+            lblDatabaseCardTitle.Text = "Database";
+            // 
+            // lblDatabaseStatus
+            // 
+            lblDatabaseStatus.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
+            lblDatabaseStatus.Location = new Point(8, 34);
+            lblDatabaseStatus.Name = "lblDatabaseStatus";
+            lblDatabaseStatus.Size = new Size(344, 42);
+            lblDatabaseStatus.TabIndex = 1;
+            lblDatabaseStatus.Text = "? Unknown";
+            // 
+            // panelAlert
+            // 
+            panelAlert.BackColor = Color.White;
+            panelAlert.BorderStyle = BorderStyle.FixedSingle;
+            panelAlert.Controls.Add(lblAlertTitle);
+            panelAlert.Controls.Add(lblAlertMessage);
+            panelAlert.Controls.Add(lblAlertAction);
+            panelAlert.Dock = DockStyle.Fill;
+            panelAlert.Location = new Point(1066, 3);
+            panelAlert.Name = "panelAlert";
+            panelAlert.Padding = new Padding(8, 6, 8, 6);
+            panelAlert.Size = new Size(389, 770);
+            panelAlert.TabIndex = 1;
+            // 
+            // lblAlertTitle
+            // 
+            lblAlertTitle.AutoSize = true;
+            lblAlertTitle.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            lblAlertTitle.Location = new Point(8, 6);
+            lblAlertTitle.Name = "lblAlertTitle";
+            lblAlertTitle.Size = new Size(43, 19);
+            lblAlertTitle.TabIndex = 0;
+            lblAlertTitle.Text = "Alerts";
+            // 
+            // lblAlertMessage
+            // 
+            lblAlertMessage.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            lblAlertMessage.Location = new Point(8, 28);
+            lblAlertMessage.Name = "lblAlertMessage";
+            lblAlertMessage.Size = new Size(370, 38);
+            lblAlertMessage.TabIndex = 1;
+            lblAlertMessage.Text = "Waiting for first refresh";
+            // 
+            // lblAlertAction
+            // 
+            lblAlertAction.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            lblAlertAction.ForeColor = Color.FromArgb(48, 72, 97);
+            lblAlertAction.Location = new Point(8, 66);
+            lblAlertAction.Name = "lblAlertAction";
+            lblAlertAction.Size = new Size(370, 38);
+            lblAlertAction.TabIndex = 2;
+            lblAlertAction.Text = "-> --";
+            // 
+            // panelRecentJobs
+            // 
+            panelRecentJobs.BackColor = Color.White;
+            panelRecentJobs.BorderStyle = BorderStyle.FixedSingle;
+            panelRecentJobs.Controls.Add(dgvRecentJobs);
+            panelRecentJobs.Controls.Add(lblRecentJobsTitle);
+            panelRecentJobs.Dock = DockStyle.Fill;
+            panelRecentJobs.Location = new Point(3, 3);
+            panelRecentJobs.Name = "panelRecentJobs";
+            panelRecentJobs.Padding = new Padding(8, 6, 8, 6);
+            panelRecentJobs.Size = new Size(1057, 770);
+            panelRecentJobs.TabIndex = 0;
+            // 
+            // lblRecentJobsTitle
+            // 
+            lblRecentJobsTitle.Dock = DockStyle.Top;
+            lblRecentJobsTitle.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            lblRecentJobsTitle.Location = new Point(8, 6);
+            lblRecentJobsTitle.Name = "lblRecentJobsTitle";
+            lblRecentJobsTitle.Size = new Size(1039, 22);
+            lblRecentJobsTitle.TabIndex = 0;
+            lblRecentJobsTitle.Text = "Recent Jobs";
+            // 
+            // dgvRecentJobs
+            // 
+            dgvRecentJobs.AllowUserToAddRows = false;
+            dgvRecentJobs.AllowUserToDeleteRows = false;
+            dgvRecentJobs.AllowUserToResizeRows = false;
+            dgvRecentJobs.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells;
+            dgvRecentJobs.BackgroundColor = Color.White;
+            dgvRecentJobs.BorderStyle = BorderStyle.None;
+            dgvRecentJobs.CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal;
+            dgvRecentJobs.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+            dgvRecentJobs.Dock = DockStyle.Fill;
+            dgvRecentJobs.Location = new Point(8, 28);
+            dgvRecentJobs.MultiSelect = false;
+            dgvRecentJobs.Name = "dgvRecentJobs";
+            dgvRecentJobs.ReadOnly = true;
+            dgvRecentJobs.RowHeadersVisible = false;
+            dgvRecentJobs.RowTemplate.Height = 22;
+            dgvRecentJobs.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            dgvRecentJobs.Size = new Size(1039, 736);
+            dgvRecentJobs.TabIndex = 1;
+            // 
+            // panelDetails
+            // 
+            panelDetails.BackColor = Color.FromArgb(243, 246, 250);
+            panelDetails.Controls.Add(tableDetails);
+            panelDetails.Dock = DockStyle.Bottom;
+            panelDetails.Location = new Point(0, 700);
+            panelDetails.Name = "panelDetails";
+            panelDetails.Padding = new Padding(12, 0, 12, 12);
+            panelDetails.Size = new Size(1480, 250);
+            panelDetails.TabIndex = 2;
+            panelDetails.Visible = false;
+            // 
+            // tableDetails
+            // 
+            tableDetails.ColumnCount = 2;
+            tableDetails.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 45F));
+            tableDetails.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 55F));
+            tableDetails.Controls.Add(panelBackupPolicy, 0, 0);
+            tableDetails.Controls.Add(panelDatabaseTopology, 1, 0);
+            tableDetails.Dock = DockStyle.Fill;
+            tableDetails.Location = new Point(12, 0);
+            tableDetails.Name = "tableDetails";
+            tableDetails.RowCount = 1;
+            tableDetails.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+            tableDetails.Size = new Size(1456, 238);
+            tableDetails.TabIndex = 0;
             // 
             // panelBackupPolicy
             // 
-            this.panelBackupPolicy.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            this.panelBackupPolicy.Controls.Add(this.lblPolicyTitle);
-            this.panelBackupPolicy.Controls.Add(this.lblPolicyFullSchedule);
-            this.panelBackupPolicy.Controls.Add(this.lblPolicyDifferentialSchedule);
-            this.panelBackupPolicy.Controls.Add(this.lblPolicyLogSchedule);
-            this.panelBackupPolicy.Controls.Add(this.lblPolicyRecoveryModel);
-            this.panelBackupPolicy.Controls.Add(this.lblPolicyRetention);
-            this.panelBackupPolicy.Controls.Add(this.lblPolicyBootstrap);
-            this.panelBackupPolicy.Location = new System.Drawing.Point(12, 330);
-            this.panelBackupPolicy.Name = "panelBackupPolicy";
-            this.panelBackupPolicy.Size = new System.Drawing.Size(380, 180);
-            this.panelBackupPolicy.TabIndex = 4;
+            panelBackupPolicy.BackColor = Color.White;
+            panelBackupPolicy.BorderStyle = BorderStyle.FixedSingle;
+            panelBackupPolicy.Controls.Add(lblPolicyTitle);
+            panelBackupPolicy.Controls.Add(lblPolicyFullSchedule);
+            panelBackupPolicy.Controls.Add(lblPolicyDifferentialSchedule);
+            panelBackupPolicy.Controls.Add(lblPolicyLogSchedule);
+            panelBackupPolicy.Controls.Add(lblPolicyRecoveryModel);
+            panelBackupPolicy.Controls.Add(lblPolicyRetention);
+            panelBackupPolicy.Controls.Add(lblPolicyBootstrap);
+            panelBackupPolicy.Dock = DockStyle.Fill;
+            panelBackupPolicy.Location = new Point(3, 3);
+            panelBackupPolicy.Name = "panelBackupPolicy";
+            panelBackupPolicy.Padding = new Padding(10);
+            panelBackupPolicy.Size = new Size(649, 232);
+            panelBackupPolicy.TabIndex = 0;
             // 
             // lblPolicyTitle
             // 
-            this.lblPolicyTitle.AutoSize = true;
-            this.lblPolicyTitle.Font = new System.Drawing.Font("Segoe UI", 11F, System.Drawing.FontStyle.Bold);
-            this.lblPolicyTitle.Location = new System.Drawing.Point(10, 10);
-            this.lblPolicyTitle.Name = "lblPolicyTitle";
-            this.lblPolicyTitle.Size = new System.Drawing.Size(98, 20);
-            this.lblPolicyTitle.TabIndex = 0;
-            this.lblPolicyTitle.Text = "Backup Policy";
+            lblPolicyTitle.AutoSize = true;
+            lblPolicyTitle.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
+            lblPolicyTitle.Location = new Point(10, 8);
+            lblPolicyTitle.Name = "lblPolicyTitle";
+            lblPolicyTitle.Size = new Size(105, 20);
+            lblPolicyTitle.TabIndex = 0;
+            lblPolicyTitle.Text = "Backup Policy";
             // 
             // lblPolicyFullSchedule
             // 
-            this.lblPolicyFullSchedule.Location = new System.Drawing.Point(10, 38);
-            this.lblPolicyFullSchedule.Name = "lblPolicyFullSchedule";
-            this.lblPolicyFullSchedule.Size = new System.Drawing.Size(358, 26);
-            this.lblPolicyFullSchedule.TabIndex = 1;
-            this.lblPolicyFullSchedule.Text = "Full Backup runs --";
+            lblPolicyFullSchedule.Location = new Point(10, 34);
+            lblPolicyFullSchedule.Name = "lblPolicyFullSchedule";
+            lblPolicyFullSchedule.Size = new Size(620, 26);
+            lblPolicyFullSchedule.TabIndex = 1;
+            lblPolicyFullSchedule.Text = "Full Backup runs --";
             // 
             // lblPolicyDifferentialSchedule
             // 
-            this.lblPolicyDifferentialSchedule.Location = new System.Drawing.Point(10, 62);
-            this.lblPolicyDifferentialSchedule.Name = "lblPolicyDifferentialSchedule";
-            this.lblPolicyDifferentialSchedule.Size = new System.Drawing.Size(358, 26);
-            this.lblPolicyDifferentialSchedule.TabIndex = 2;
-            this.lblPolicyDifferentialSchedule.Text = "Differential Backup runs --";
+            lblPolicyDifferentialSchedule.Location = new Point(10, 58);
+            lblPolicyDifferentialSchedule.Name = "lblPolicyDifferentialSchedule";
+            lblPolicyDifferentialSchedule.Size = new Size(620, 26);
+            lblPolicyDifferentialSchedule.TabIndex = 2;
+            lblPolicyDifferentialSchedule.Text = "Differential Backup runs --";
             // 
             // lblPolicyLogSchedule
             // 
-            this.lblPolicyLogSchedule.Location = new System.Drawing.Point(10, 86);
-            this.lblPolicyLogSchedule.Name = "lblPolicyLogSchedule";
-            this.lblPolicyLogSchedule.Size = new System.Drawing.Size(358, 26);
-            this.lblPolicyLogSchedule.TabIndex = 3;
-            this.lblPolicyLogSchedule.Text = "Transaction Log Backup runs --";
+            lblPolicyLogSchedule.Location = new Point(10, 82);
+            lblPolicyLogSchedule.Name = "lblPolicyLogSchedule";
+            lblPolicyLogSchedule.Size = new Size(620, 26);
+            lblPolicyLogSchedule.TabIndex = 3;
+            lblPolicyLogSchedule.Text = "Transaction Log Backup runs --";
             // 
             // lblPolicyRecoveryModel
             // 
-            this.lblPolicyRecoveryModel.AutoSize = true;
-            this.lblPolicyRecoveryModel.Location = new System.Drawing.Point(10, 114);
-            this.lblPolicyRecoveryModel.Name = "lblPolicyRecoveryModel";
-            this.lblPolicyRecoveryModel.Size = new System.Drawing.Size(101, 15);
-            this.lblPolicyRecoveryModel.TabIndex = 4;
-            this.lblPolicyRecoveryModel.Text = "Recovery Model: --";
+            lblPolicyRecoveryModel.AutoSize = true;
+            lblPolicyRecoveryModel.Location = new Point(10, 112);
+            lblPolicyRecoveryModel.Name = "lblPolicyRecoveryModel";
+            lblPolicyRecoveryModel.Size = new Size(108, 15);
+            lblPolicyRecoveryModel.TabIndex = 4;
+            lblPolicyRecoveryModel.Text = "Recovery Model: --";
             // 
             // lblPolicyRetention
             // 
-            this.lblPolicyRetention.AutoSize = true;
-            this.lblPolicyRetention.Location = new System.Drawing.Point(10, 132);
-            this.lblPolicyRetention.Name = "lblPolicyRetention";
-            this.lblPolicyRetention.Size = new System.Drawing.Size(77, 15);
-            this.lblPolicyRetention.TabIndex = 5;
-            this.lblPolicyRetention.Text = "Retention: --";
+            lblPolicyRetention.AutoSize = true;
+            lblPolicyRetention.Location = new Point(10, 131);
+            lblPolicyRetention.Name = "lblPolicyRetention";
+            lblPolicyRetention.Size = new Size(74, 15);
+            lblPolicyRetention.TabIndex = 5;
+            lblPolicyRetention.Text = "Retention: --";
             // 
             // lblPolicyBootstrap
             // 
-            this.lblPolicyBootstrap.AutoSize = true;
-            this.lblPolicyBootstrap.Location = new System.Drawing.Point(10, 150);
-            this.lblPolicyBootstrap.Name = "lblPolicyBootstrap";
-            this.lblPolicyBootstrap.Size = new System.Drawing.Size(0, 15);
-            this.lblPolicyBootstrap.TabIndex = 6;
+            lblPolicyBootstrap.Location = new Point(10, 149);
+            lblPolicyBootstrap.Name = "lblPolicyBootstrap";
+            lblPolicyBootstrap.Size = new Size(620, 44);
+            lblPolicyBootstrap.TabIndex = 6;
+            lblPolicyBootstrap.Text = "";
             // 
             // panelDatabaseTopology
             // 
-            this.panelDatabaseTopology.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            this.panelDatabaseTopology.Controls.Add(this.lblDatabaseTopologyTitle);
-            this.panelDatabaseTopology.Controls.Add(this.lblDbName);
-            this.panelDatabaseTopology.Controls.Add(this.lblDbServer);
-            this.panelDatabaseTopology.Controls.Add(this.lblDbRecoveryModel);
-            this.panelDatabaseTopology.Controls.Add(this.lblTopologyProdServer);
-            this.panelDatabaseTopology.Controls.Add(this.lblTopologyBackupServer);
-            this.panelDatabaseTopology.Controls.Add(this.lblTopologyDestinationPath);
-            this.panelDatabaseTopology.Controls.Add(this.lblPulseStatus);
-            this.panelDatabaseTopology.Controls.Add(this.lblPulseLastChecked);
-            this.panelDatabaseTopology.Controls.Add(this.lblChainInitialized);
-            this.panelDatabaseTopology.Controls.Add(this.lblLastValidFullBackup);
-            this.panelDatabaseTopology.Controls.Add(this.lblRestoreChainHealthSimple);
-            this.panelDatabaseTopology.Controls.Add(this.lblChainInitializationWarning);
-            this.panelDatabaseTopology.Location = new System.Drawing.Point(12, 520);
-            this.panelDatabaseTopology.Name = "panelDatabaseTopology";
-            this.panelDatabaseTopology.Size = new System.Drawing.Size(380, 300);
-            this.panelDatabaseTopology.TabIndex = 5;
+            panelDatabaseTopology.BackColor = Color.White;
+            panelDatabaseTopology.BorderStyle = BorderStyle.FixedSingle;
+            panelDatabaseTopology.Controls.Add(lblDatabaseTopologyTitle);
+            panelDatabaseTopology.Controls.Add(lblDbName);
+            panelDatabaseTopology.Controls.Add(lblDbServer);
+            panelDatabaseTopology.Controls.Add(lblDbRecoveryModel);
+            panelDatabaseTopology.Controls.Add(lblTopologyProdServer);
+            panelDatabaseTopology.Controls.Add(lblTopologyBackupServer);
+            panelDatabaseTopology.Controls.Add(lblTopologyDestinationPath);
+            panelDatabaseTopology.Controls.Add(lblPulseStatus);
+            panelDatabaseTopology.Controls.Add(lblPulseLastChecked);
+            panelDatabaseTopology.Controls.Add(lblChainInitialized);
+            panelDatabaseTopology.Controls.Add(lblLastValidFullBackup);
+            panelDatabaseTopology.Controls.Add(lblRestoreChainHealthSimple);
+            panelDatabaseTopology.Controls.Add(lblChainInitializationWarning);
+            panelDatabaseTopology.Dock = DockStyle.Fill;
+            panelDatabaseTopology.Location = new Point(658, 3);
+            panelDatabaseTopology.Name = "panelDatabaseTopology";
+            panelDatabaseTopology.Padding = new Padding(10);
+            panelDatabaseTopology.Size = new Size(795, 232);
+            panelDatabaseTopology.TabIndex = 1;
             // 
             // lblDatabaseTopologyTitle
             // 
-            this.lblDatabaseTopologyTitle.AutoSize = true;
-            this.lblDatabaseTopologyTitle.Font = new System.Drawing.Font("Segoe UI", 11F, System.Drawing.FontStyle.Bold);
-            this.lblDatabaseTopologyTitle.Location = new System.Drawing.Point(10, 10);
-            this.lblDatabaseTopologyTitle.Name = "lblDatabaseTopologyTitle";
-            this.lblDatabaseTopologyTitle.Size = new System.Drawing.Size(129, 20);
-            this.lblDatabaseTopologyTitle.TabIndex = 0;
-            this.lblDatabaseTopologyTitle.Text = "Database Topology";
+            lblDatabaseTopologyTitle.AutoSize = true;
+            lblDatabaseTopologyTitle.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
+            lblDatabaseTopologyTitle.Location = new Point(10, 8);
+            lblDatabaseTopologyTitle.Name = "lblDatabaseTopologyTitle";
+            lblDatabaseTopologyTitle.Size = new Size(118, 20);
+            lblDatabaseTopologyTitle.TabIndex = 0;
+            lblDatabaseTopologyTitle.Text = "System Context";
             // 
             // lblDbName
             // 
-            this.lblDbName.AutoSize = true;
-            this.lblDbName.Location = new System.Drawing.Point(10, 36);
-            this.lblDbName.Name = "lblDbName";
-            this.lblDbName.Size = new System.Drawing.Size(78, 15);
-            this.lblDbName.TabIndex = 1;
-            this.lblDbName.Text = "Database: --";
+            lblDbName.AutoSize = true;
+            lblDbName.Location = new Point(10, 34);
+            lblDbName.Name = "lblDbName";
+            lblDbName.Size = new Size(71, 15);
+            lblDbName.TabIndex = 1;
+            lblDbName.Text = "Database: --";
             // 
             // lblDbServer
             // 
-            this.lblDbServer.AutoSize = true;
-            this.lblDbServer.Location = new System.Drawing.Point(10, 54);
-            this.lblDbServer.Name = "lblDbServer";
-            this.lblDbServer.Size = new System.Drawing.Size(151, 15);
-            this.lblDbServer.TabIndex = 2;
-            this.lblDbServer.Text = "Production SQL Server: --";
+            lblDbServer.AutoSize = true;
+            lblDbServer.Location = new Point(10, 51);
+            lblDbServer.Name = "lblDbServer";
+            lblDbServer.Size = new Size(141, 15);
+            lblDbServer.TabIndex = 2;
+            lblDbServer.Text = "Production SQL Server: --";
             // 
             // lblDbRecoveryModel
             // 
-            this.lblDbRecoveryModel.AutoSize = true;
-            this.lblDbRecoveryModel.Location = new System.Drawing.Point(10, 72);
-            this.lblDbRecoveryModel.Name = "lblDbRecoveryModel";
-            this.lblDbRecoveryModel.Size = new System.Drawing.Size(117, 15);
-            this.lblDbRecoveryModel.TabIndex = 3;
-            this.lblDbRecoveryModel.Text = "Recovery Model: --";
+            lblDbRecoveryModel.AutoSize = true;
+            lblDbRecoveryModel.Location = new Point(10, 68);
+            lblDbRecoveryModel.Name = "lblDbRecoveryModel";
+            lblDbRecoveryModel.Size = new Size(108, 15);
+            lblDbRecoveryModel.TabIndex = 3;
+            lblDbRecoveryModel.Text = "Recovery Model: --";
             // 
             // lblTopologyProdServer
             // 
-            this.lblTopologyProdServer.AutoSize = true;
-            this.lblTopologyProdServer.Location = new System.Drawing.Point(10, 96);
-            this.lblTopologyProdServer.Name = "lblTopologyProdServer";
-            this.lblTopologyProdServer.Size = new System.Drawing.Size(143, 15);
-            this.lblTopologyProdServer.TabIndex = 4;
-            this.lblTopologyProdServer.Text = "Production DB Server: --";
+            lblTopologyProdServer.AutoSize = true;
+            lblTopologyProdServer.Location = new Point(10, 86);
+            lblTopologyProdServer.Name = "lblTopologyProdServer";
+            lblTopologyProdServer.Size = new Size(135, 15);
+            lblTopologyProdServer.TabIndex = 4;
+            lblTopologyProdServer.Text = "Production DB Server: --";
             // 
             // lblTopologyBackupServer
             // 
-            this.lblTopologyBackupServer.AutoSize = true;
-            this.lblTopologyBackupServer.Location = new System.Drawing.Point(10, 114);
-            this.lblTopologyBackupServer.Name = "lblTopologyBackupServer";
-            this.lblTopologyBackupServer.Size = new System.Drawing.Size(145, 15);
-            this.lblTopologyBackupServer.TabIndex = 5;
-            this.lblTopologyBackupServer.Text = "Backup Storage Server: --";
+            lblTopologyBackupServer.AutoSize = true;
+            lblTopologyBackupServer.Location = new Point(10, 103);
+            lblTopologyBackupServer.Name = "lblTopologyBackupServer";
+            lblTopologyBackupServer.Size = new Size(140, 15);
+            lblTopologyBackupServer.TabIndex = 5;
+            lblTopologyBackupServer.Text = "Backup Storage Server: --";
             // 
             // lblTopologyDestinationPath
             // 
-            this.lblTopologyDestinationPath.AutoSize = true;
-            this.lblTopologyDestinationPath.Location = new System.Drawing.Point(10, 132);
-            this.lblTopologyDestinationPath.Name = "lblTopologyDestinationPath";
-            this.lblTopologyDestinationPath.Size = new System.Drawing.Size(131, 15);
-            this.lblTopologyDestinationPath.TabIndex = 6;
-            this.lblTopologyDestinationPath.Text = "Backup Destination: --";
+            lblTopologyDestinationPath.Location = new Point(10, 120);
+            lblTopologyDestinationPath.Name = "lblTopologyDestinationPath";
+            lblTopologyDestinationPath.Size = new Size(770, 16);
+            lblTopologyDestinationPath.TabIndex = 6;
+            lblTopologyDestinationPath.Text = "Backup Destination: --";
             // 
             // lblPulseStatus
             // 
-            this.lblPulseStatus.AutoSize = true;
-            this.lblPulseStatus.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold);
-            this.lblPulseStatus.Location = new System.Drawing.Point(10, 151);
-            this.lblPulseStatus.Name = "lblPulseStatus";
-            this.lblPulseStatus.Size = new System.Drawing.Size(107, 19);
-            this.lblPulseStatus.TabIndex = 7;
-            this.lblPulseStatus.Text = "Status: Unknown";
+            lblPulseStatus.AutoSize = true;
+            lblPulseStatus.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            lblPulseStatus.Location = new Point(10, 142);
+            lblPulseStatus.Name = "lblPulseStatus";
+            lblPulseStatus.Size = new Size(119, 19);
+            lblPulseStatus.TabIndex = 7;
+            lblPulseStatus.Text = "Status: Unknown";
             // 
             // lblPulseLastChecked
             // 
-            this.lblPulseLastChecked.AutoSize = true;
-            this.lblPulseLastChecked.Location = new System.Drawing.Point(10, 170);
-            this.lblPulseLastChecked.Name = "lblPulseLastChecked";
-            this.lblPulseLastChecked.Size = new System.Drawing.Size(95, 15);
-            this.lblPulseLastChecked.TabIndex = 8;
-            this.lblPulseLastChecked.Text = "Last Checked: --";
+            lblPulseLastChecked.AutoSize = true;
+            lblPulseLastChecked.Location = new Point(10, 162);
+            lblPulseLastChecked.Name = "lblPulseLastChecked";
+            lblPulseLastChecked.Size = new Size(93, 15);
+            lblPulseLastChecked.TabIndex = 8;
+            lblPulseLastChecked.Text = "Last Checked: --";
             // 
             // lblChainInitialized
             // 
-            this.lblChainInitialized.AutoSize = true;
-            this.lblChainInitialized.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold);
-            this.lblChainInitialized.Location = new System.Drawing.Point(10, 194);
-            this.lblChainInitialized.Name = "lblChainInitialized";
-            this.lblChainInitialized.Size = new System.Drawing.Size(199, 19);
-            this.lblChainInitialized.TabIndex = 9;
-            this.lblChainInitialized.Text = "Backup Chain Initialized: --";
+            lblChainInitialized.AutoSize = true;
+            lblChainInitialized.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            lblChainInitialized.Location = new Point(246, 142);
+            lblChainInitialized.Name = "lblChainInitialized";
+            lblChainInitialized.Size = new Size(188, 19);
+            lblChainInitialized.TabIndex = 9;
+            lblChainInitialized.Text = "Backup Chain Initialized: --";
             // 
             // lblLastValidFullBackup
             // 
-            this.lblLastValidFullBackup.Location = new System.Drawing.Point(10, 214);
-            this.lblLastValidFullBackup.Name = "lblLastValidFullBackup";
-            this.lblLastValidFullBackup.Size = new System.Drawing.Size(358, 32);
-            this.lblLastValidFullBackup.TabIndex = 10;
-            this.lblLastValidFullBackup.Text = "Last Valid Full Backup: --";
+            lblLastValidFullBackup.Location = new Point(246, 162);
+            lblLastValidFullBackup.Name = "lblLastValidFullBackup";
+            lblLastValidFullBackup.Size = new Size(534, 16);
+            lblLastValidFullBackup.TabIndex = 10;
+            lblLastValidFullBackup.Text = "Last Valid Full Backup: --";
             // 
             // lblRestoreChainHealthSimple
             // 
-            this.lblRestoreChainHealthSimple.AutoSize = true;
-            this.lblRestoreChainHealthSimple.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold);
-            this.lblRestoreChainHealthSimple.Location = new System.Drawing.Point(10, 246);
-            this.lblRestoreChainHealthSimple.Name = "lblRestoreChainHealthSimple";
-            this.lblRestoreChainHealthSimple.Size = new System.Drawing.Size(167, 19);
-            this.lblRestoreChainHealthSimple.TabIndex = 11;
-            this.lblRestoreChainHealthSimple.Text = "Restore Chain Health: --";
+            lblRestoreChainHealthSimple.AutoSize = true;
+            lblRestoreChainHealthSimple.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            lblRestoreChainHealthSimple.Location = new Point(246, 180);
+            lblRestoreChainHealthSimple.Name = "lblRestoreChainHealthSimple";
+            lblRestoreChainHealthSimple.Size = new Size(169, 19);
+            lblRestoreChainHealthSimple.TabIndex = 11;
+            lblRestoreChainHealthSimple.Text = "Restore Chain Health: --";
             // 
             // lblChainInitializationWarning
             // 
-            this.lblChainInitializationWarning.Location = new System.Drawing.Point(10, 268);
-            this.lblChainInitializationWarning.Name = "lblChainInitializationWarning";
-            this.lblChainInitializationWarning.Size = new System.Drawing.Size(358, 28);
-            this.lblChainInitializationWarning.TabIndex = 12;
-            this.lblChainInitializationWarning.Text = "--";
+            lblChainInitializationWarning.Location = new Point(246, 200);
+            lblChainInitializationWarning.Name = "lblChainInitializationWarning";
+            lblChainInitializationWarning.Size = new Size(534, 22);
+            lblChainInitializationWarning.TabIndex = 12;
+            lblChainInitializationWarning.Text = "--";
             // 
             // MonitoringDashboard
             // 
-            this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
-            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(1200, 1020);
-            this.Controls.Add(this.panelDatabaseTopology);
-            this.Controls.Add(this.panelBackupPolicy);
-            this.Controls.Add(this.panelStorageStatus);
-            this.Controls.Add(this.panelRecentJobs);
-            this.Controls.Add(this.panelLastBackupStatus);
-            this.Controls.Add(this.panelHeader);
-            this.MinimumSize = new System.Drawing.Size(1000, 1020);
-            this.Name = "MonitoringDashboard";
-            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
-            this.Text = "Deadpool - Backup Monitoring Dashboard";
-            this.Load += new System.EventHandler(this.MonitoringDashboard_Load);
-            this.panelHeader.ResumeLayout(false);
-            this.panelHeader.PerformLayout();
-            this.panelLastBackupStatus.ResumeLayout(false);
-            this.panelLastBackupStatus.PerformLayout();
-            this.panelRecentJobs.ResumeLayout(false);
-            this.panelRecentJobs.PerformLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.dgvRecentJobs)).EndInit();
-            this.panelStorageStatus.ResumeLayout(false);
-            this.panelStorageStatus.PerformLayout();
-            this.panelBackupPolicy.ResumeLayout(false);
-            this.panelBackupPolicy.PerformLayout();
-            this.panelDatabaseTopology.ResumeLayout(false);
-            this.panelDatabaseTopology.PerformLayout();
-            this.ResumeLayout(false);
-
+            AutoScaleDimensions = new SizeF(7F, 15F);
+            AutoScaleMode = AutoScaleMode.Font;
+            BackColor = Color.FromArgb(243, 246, 250);
+            ClientSize = new Size(1280, 720);
+            Controls.Add(tableBody);
+            Controls.Add(panelDetails);
+            Controls.Add(panelHeader);
+            MinimumSize = new Size(1200, 700);
+            Name = "MonitoringDashboard";
+            StartPosition = FormStartPosition.CenterScreen;
+            Text = "Deadpool - Backup Monitoring Dashboard";
+            Load += MonitoringDashboard_Load;
+            panelHeader.ResumeLayout(false);
+            panelHeader.PerformLayout();
+            tableBody.ResumeLayout(false);
+            tableLeftCards.ResumeLayout(false);
+            tableMainBottom.ResumeLayout(false);
+            panelLastBackupStatus.ResumeLayout(false);
+            panelLastBackupStatus.PerformLayout();
+            panelChainHealthCard.ResumeLayout(false);
+            panelChainHealthCard.PerformLayout();
+            panelStorageStatus.ResumeLayout(false);
+            panelStorageStatus.PerformLayout();
+            panelDatabaseCard.ResumeLayout(false);
+            panelDatabaseCard.PerformLayout();
+            panelAlert.ResumeLayout(false);
+            panelAlert.PerformLayout();
+            panelRecentJobs.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)dgvRecentJobs).EndInit();
+            panelDetails.ResumeLayout(false);
+            tableDetails.ResumeLayout(false);
+            panelBackupPolicy.ResumeLayout(false);
+            panelBackupPolicy.PerformLayout();
+            panelDatabaseTopology.ResumeLayout(false);
+            panelDatabaseTopology.PerformLayout();
+            ResumeLayout(false);
         }
 
         #endregion
 
-        private System.Windows.Forms.Panel panelHeader;
-        private System.Windows.Forms.Label lblTitle;
-        private System.Windows.Forms.Label lblLastRefresh;
-        private System.Windows.Forms.Button btnRefresh;
-        private System.Windows.Forms.Button btnJobMonitor;
-        private System.Windows.Forms.Panel panelLastBackupStatus;
-        private System.Windows.Forms.Label lblLastBackupTitle;
-        private System.Windows.Forms.Label lblFullBackup;
-        private System.Windows.Forms.Label lblDiffBackup;
-        private System.Windows.Forms.Label lblLogBackup;
-        private System.Windows.Forms.Label lblChainHealth;
-        private System.Windows.Forms.ListBox lstWarnings;
-        private System.Windows.Forms.Panel panelRecentJobs;
-        private System.Windows.Forms.Label lblRecentJobsTitle;
-        private System.Windows.Forms.DataGridView dgvRecentJobs;
-        private System.Windows.Forms.Panel panelStorageStatus;
-        private System.Windows.Forms.Label lblStorageTitle;
-        private System.Windows.Forms.Label lblStoragePath;
-        private System.Windows.Forms.Label lblStorageSpace;
-        private System.Windows.Forms.Label lblStorageHealth;
-        private System.Windows.Forms.ProgressBar progressBarStorage;
-        private System.Windows.Forms.Panel panelBackupPolicy;
-        private System.Windows.Forms.Label lblPolicyTitle;
-        private System.Windows.Forms.Label lblPolicyFullSchedule;
-        private System.Windows.Forms.Label lblPolicyDifferentialSchedule;
-        private System.Windows.Forms.Label lblPolicyLogSchedule;
-        private System.Windows.Forms.Label lblPolicyRecoveryModel;
-        private System.Windows.Forms.Label lblPolicyRetention;
-        private System.Windows.Forms.Label lblPolicyBootstrap;
-        private System.Windows.Forms.Panel panelDatabaseTopology;
-        private System.Windows.Forms.Label lblDatabaseTopologyTitle;
-        private System.Windows.Forms.Label lblDbName;
-        private System.Windows.Forms.Label lblDbServer;
-        private System.Windows.Forms.Label lblDbRecoveryModel;
-        private System.Windows.Forms.Label lblTopologyProdServer;
-        private System.Windows.Forms.Label lblTopologyBackupServer;
-        private System.Windows.Forms.Label lblTopologyDestinationPath;
-        private System.Windows.Forms.Label lblPulseStatus;
-        private System.Windows.Forms.Label lblPulseLastChecked;
-        private System.Windows.Forms.Label lblChainInitialized;
-        private System.Windows.Forms.Label lblLastValidFullBackup;
-        private System.Windows.Forms.Label lblRestoreChainHealthSimple;
-        private System.Windows.Forms.Label lblChainInitializationWarning;
+        private Panel panelHeader;
+        private Label lblTitle;
+        private Label lblSystemStatus;
+        private Label lblDbSummary;
+        private Label lblNextRisk;
+        private Label lblLastRefresh;
+        private Button btnJobMonitor;
+        private Button btnRefresh;
+        private TableLayoutPanel tableBody;
+        private TableLayoutPanel tableLeftCards;
+        private TableLayoutPanel tableMainBottom;
+        private Panel panelLastBackupStatus;
+        private Label lblLastBackupTitle;
+        private Label lblFullBackup;
+        private Label lblDiffBackup;
+        private Label lblLogBackup;
+        private Panel panelChainHealthCard;
+        private Label lblChainHealthTitle;
+        private Label lblChainHealth;
+        private Label lblChainMessage;
+        private Label lblChainAction;
+        private Panel panelStorageStatus;
+        private Label lblStorageTitle;
+        private Label lblStoragePath;
+        private Label lblStorageSpace;
+        private Label lblEstimatedFullBackup;
+        private Label lblStoragePrediction;
+        private ProgressBar progressBarStorage;
+        private Panel panelDatabaseCard;
+        private Label lblDatabaseCardTitle;
+        private Label lblDatabaseStatus;
+        private Panel panelAlert;
+        private Label lblAlertTitle;
+        private Label lblAlertMessage;
+        private Label lblAlertAction;
+        private Panel panelRecentJobs;
+        private Label lblRecentJobsTitle;
+        private DataGridView dgvRecentJobs;
+        private Panel panelDetails;
+        private TableLayoutPanel tableDetails;
+        private Panel panelBackupPolicy;
+        private Label lblPolicyTitle;
+        private Label lblPolicyFullSchedule;
+        private Label lblPolicyDifferentialSchedule;
+        private Label lblPolicyLogSchedule;
+        private Label lblPolicyRecoveryModel;
+        private Label lblPolicyRetention;
+        private Label lblPolicyBootstrap;
+        private Panel panelDatabaseTopology;
+        private Label lblDatabaseTopologyTitle;
+        private Label lblDbName;
+        private Label lblDbServer;
+        private Label lblDbRecoveryModel;
+        private Label lblTopologyProdServer;
+        private Label lblTopologyBackupServer;
+        private Label lblTopologyDestinationPath;
+        private Label lblPulseStatus;
+        private Label lblPulseLastChecked;
+        private Label lblChainInitialized;
+        private Label lblLastValidFullBackup;
+        private Label lblRestoreChainHealthSimple;
+        private Label lblChainInitializationWarning;
     }
 }

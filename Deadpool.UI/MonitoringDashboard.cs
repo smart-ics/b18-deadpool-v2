@@ -3,8 +3,7 @@ using Deadpool.Core.Domain.ValueObjects;
 using Deadpool.Core.Interfaces;
 using Deadpool.UI.Configuration;
 using Microsoft.Extensions.Logging;
-using System.Drawing.Drawing2D;
-using System.Text.RegularExpressions;
+using System.IO;
 
 namespace Deadpool.UI;
 
@@ -22,32 +21,7 @@ public partial class MonitoringDashboard : Form
     private readonly DatabaseBackupPolicyOptions? _backupPolicy;
     private readonly System.Windows.Forms.Timer? _autoRefreshTimer;
     private DateTime _lastUpdateTime;
-    private List<RecentJobSummary> _timelineJobs = new();
-
-    private const int CardPadding = 12;
-    private readonly Color _bgColor = Color.FromArgb(243, 246, 251);
-    private readonly Color _headerColor = Color.FromArgb(22, 34, 51);
-    private readonly Color _cardColor = Color.White;
-
-    private Panel? _panelBody;
-    private TableLayoutPanel? _layoutBody;
-    private FlowLayoutPanel? _leftCards;
-    private Panel? _panelChainHealthCard;
-    private Panel? _panelTimeline;
-    private Panel? _panelAlert;
-
-    private Label? _lblGlobalStatus;
-    private Label? _lblDatabaseSummary;
-    private Label? _lblNextRisk;
-    private Label? _lblChainCardStatus;
-    private Label? _lblChainCardMessage;
-    private Label? _lblChainCardAction;
-    private Label? _lblStorageRiskPrediction;
-    private Label? _lblStorageRiskEstimate;
-    private Label? _lblStorageRiskFree;
-    private Label? _lblAlertMessage;
-    private Label? _lblAlertAction;
-    private Label? _lblTimelineLegend;
+    private long? _estimatedNextFullBackupBytes;
 
     public MonitoringDashboard(
         IDashboardMonitoringService dashboardService,
@@ -66,8 +40,6 @@ public partial class MonitoringDashboard : Form
         _backupPolicy = backupPolicy;
 
         InitializeComponent();
-        BuildOperationalLayout();
-        ConfigureRecentJobsGrid();
         DisplayBackupPolicySummary();
         DisplayDatabaseTopology();
 
@@ -129,7 +101,7 @@ public partial class MonitoringDashboard : Form
             DisplayChainInitializationStatus(snapshot.ChainInitializationStatus);
             DisplayDatabasePulse(snapshot.DatabasePulseStatus);
             DisplayGlobalHeader(snapshot);
-            DisplayActionableAlert(snapshot);
+            DisplayActionableAlert(snapshot.LastBackupStatus, snapshot.StorageStatus, snapshot.ChainInitializationStatus);
 
             _lastUpdateTime = snapshot.SnapshotTime;
             lblLastRefresh.Text = $"Last refresh: {snapshot.SnapshotTime:yyyy-MM-dd HH:mm:ss} UTC";
@@ -153,24 +125,28 @@ public partial class MonitoringDashboard : Form
 
     private void DisplayFallbackState()
     {
-        // Show safe "Unknown" state rather than false Critical alarms
-        lblFullBackup.Text = "Full: Unknown";
-        lblDiffBackup.Text = "Differential: Unknown";
-        lblLogBackup.Text = "Log: Unknown";
-        lblChainHealth.Text = "Chain Health: Unknown";
+        lblFullBackup.Text = "FULL  Unknown";
+        lblDiffBackup.Text = "DIFF  Unknown";
+        lblLogBackup.Text = "LOG   Unknown";
+        lblChainHealth.Text = "UNKNOWN";
         lblChainHealth.ForeColor = Color.Gray;
+        lblChainMessage.Text = "Unable to evaluate backup chain state";
+        lblChainAction.Text = "Action: verify agent connectivity and refresh";
 
-        lstWarnings.Items.Clear();
-        lstWarnings.Items.Add("⚠️ Unable to load backup status");
+        lblAlertMessage.Text = "Unable to load backup status";
+        lblAlertAction.Text = "-> Check SQL and storage connectivity";
 
         panelLastBackupStatus.BackColor = Color.White;
+        panelChainHealthCard.BackColor = Color.White;
 
         dgvRecentJobs.DataSource = null;
 
-        lblStoragePath.Text = "Path: Unknown";
+        _estimatedNextFullBackupBytes = null;
+        lblStoragePath.Text = "Volume: Unknown";
         lblStorageSpace.Text = "Free: Unknown";
-        lblStorageHealth.Text = "Health: Unknown";
-        lblStorageHealth.ForeColor = Color.Gray;
+        lblEstimatedFullBackup.Text = "Next FULL: Unknown";
+        lblStoragePrediction.Text = "Status: CHECK";
+        lblStoragePrediction.ForeColor = Color.Gray;
         progressBarStorage.Value = 0;
         panelStorageStatus.BackColor = Color.White;
 
@@ -182,25 +158,12 @@ public partial class MonitoringDashboard : Form
         lblRestoreChainHealthSimple.Text = "Restore Chain Health: Unknown";
         lblChainInitializationWarning.Text = string.Empty;
 
-        if (_lblGlobalStatus != null)
-        {
-            _lblGlobalStatus.Text = "UNKNOWN";
-            _lblGlobalStatus.BackColor = Color.FromArgb(110, 118, 129);
-        }
-
-        if (_lblDatabaseSummary != null)
-            _lblDatabaseSummary.Text = "Databases: 1 total | 0 healthy | 1 warning | 0 critical";
-
-        if (_lblNextRisk != null)
-            _lblNextRisk.Text = "Next Risk: Telemetry unavailable";
-
-        if (_lblAlertMessage != null)
-            _lblAlertMessage.Text = "Unable to load backup status";
-
-        if (_lblAlertAction != null)
-            _lblAlertAction.Text = "Action: Verify connectivity to monitoring repositories and refresh.";
-
-        _panelTimeline?.Invalidate();
+        lblSystemStatus.Text = "UNKNOWN";
+        lblSystemStatus.ForeColor = Color.Gray;
+        lblDbSummary.Text = "Next Backup: FULL -- | DIFF -- | LOG --";
+        lblNextRisk.Text = "Unable to determine next risk";
+        lblDatabaseStatus.Text = "? Unknown";
+        lblDatabaseStatus.ForeColor = Color.Gray;
     }
 
     private void DisplayBackupPolicySummary()
@@ -213,6 +176,7 @@ public partial class MonitoringDashboard : Form
             lblPolicyRecoveryModel.Text = "Recovery Model: Unknown";
             lblPolicyRetention.Text = "Retention: Unknown";
             lblPolicyBootstrap.Text = string.Empty;
+            lblDbSummary.Text = "Next Backup: FULL -- | DIFF -- | LOG --";
             return;
         }
 
@@ -230,134 +194,112 @@ public partial class MonitoringDashboard : Form
         lblPolicyRecoveryModel.Text = summary.RecoveryModel;
         lblPolicyRetention.Text = summary.Retention;
         lblPolicyBootstrap.Text = summary.BootstrapFullBackupEnabled ?? string.Empty;
+
+        lblDbSummary.Text =
+            $"Next Backup: FULL {ToCompactSchedule(summary.FullBackupSchedule)} | " +
+            $"DIFF {ToCompactSchedule(summary.DifferentialBackupSchedule)} | " +
+            $"LOG {ToCompactSchedule(summary.TransactionLogBackupSchedule)}";
     }
 
     private void DisplayLastBackupStatus(LastBackupStatus status)
     {
-        // Display backup times
-        lblFullBackup.Text = $"FULL   {FormatBackupTime(status.LastFullBackup)}";
-        lblDiffBackup.Text = $"DIFF   {FormatBackupTime(status.LastDifferentialBackup)}";
-        lblLogBackup.Text = $"LOG    {FormatBackupTime(status.LastLogBackup)}";
-        lblFullBackup.ForeColor = status.LastFullBackup.HasValue ? Color.FromArgb(28, 106, 49) : Color.FromArgb(183, 28, 28);
-        lblDiffBackup.ForeColor = status.LastDifferentialBackup.HasValue ? Color.FromArgb(28, 106, 49) : Color.FromArgb(183, 28, 28);
-        lblLogBackup.ForeColor = status.LastLogBackup.HasValue ? Color.FromArgb(28, 106, 49) : Color.FromArgb(183, 28, 28);
+        lblFullBackup.Text = $"FULL {GetBackupStateIcon(status.LastFullBackup)} {FormatBackupTime(status.LastFullBackup)}";
+        lblDiffBackup.Text = $"DIFF {GetBackupStateIcon(status.LastDifferentialBackup)} {FormatBackupTime(status.LastDifferentialBackup)}";
+        lblLogBackup.Text = $"LOG  {GetBackupStateIcon(status.LastLogBackup)} {FormatBackupTime(status.LastLogBackup)}";
 
-        // Display chain health
-        lblChainHealth.Text = $"Chain Health: {status.ChainHealthSummary}";
+        lblFullBackup.ForeColor = status.LastFullBackup.HasValue ? Color.FromArgb(16, 124, 16) : Color.FromArgb(196, 43, 28);
+        lblDiffBackup.ForeColor = status.LastDifferentialBackup.HasValue ? Color.FromArgb(16, 124, 16) : Color.FromArgb(196, 43, 28);
+        lblLogBackup.ForeColor = status.LastLogBackup.HasValue ? Color.FromArgb(16, 124, 16) : Color.FromArgb(196, 43, 28);
+
+        lblChainHealth.Text = status.OverallHealth.ToString().ToUpperInvariant();
         lblChainHealth.ForeColor = GetHealthColor(status.OverallHealth);
+        panelChainHealthCard.BackColor = GetHealthBackgroundColor(status.OverallHealth);
 
-        if (_lblChainCardStatus != null)
-            _lblChainCardStatus.Text = StatusBadgeText(status.OverallHealth);
+        var chainMessage = status.CriticalIssues.FirstOrDefault()
+            ?? status.Warnings.FirstOrDefault()
+            ?? "Backup chain is healthy";
+        lblChainMessage.Text = chainMessage;
+        lblChainAction.Text = BuildChainActionSuggestion(status).Replace("Action: ", "-> ");
 
-        if (_lblChainCardMessage != null)
-            _lblChainCardMessage.Text = BuildChainMessage(status);
-
-        if (_lblChainCardAction != null)
-            _lblChainCardAction.Text = BuildChainAction(status);
-
-        // Display warnings and critical issues
-        lstWarnings.Items.Clear();
-        foreach (var critical in status.CriticalIssues)
-        {
-            lstWarnings.Items.Add($"❌ CRITICAL: {critical}");
-        }
-        foreach (var warning in status.Warnings)
-        {
-            lstWarnings.Items.Add($"⚠️ WARNING: {warning}");
-        }
-
-        if (status.CriticalIssues.Count == 0 && status.Warnings.Count == 0)
-        {
-            lstWarnings.Items.Add("✅ No warnings or issues");
-        }
-
-        // Set panel background color based on health
         panelLastBackupStatus.BackColor = GetHealthBackgroundColor(status.OverallHealth);
-        _panelChainHealthCard!.BackColor = GetHealthBackgroundColor(status.OverallHealth);
     }
 
     private void DisplayRecentJobs(List<RecentJobSummary> recentJobs)
     {
         dgvRecentJobs.DataSource = null;
 
-        _timelineJobs = recentJobs
-            .Where(job => job.StartTime.HasValue)
-            .OrderBy(job => job.StartTime)
-            .ToList();
+        _estimatedNextFullBackupBytes = EstimateNextFullBackupSizeBytes(recentJobs);
 
         var displayJobs = recentJobs.Select(job => new
         {
-            StatusIcon = GetStatusIcon(job.Status),
-            Type = job.BackupType.ToString(),
-            StartTime = job.StartTime?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss") ?? "--",
-            EndTime = job.EndTime?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss") ?? "--",
-            Status = job.Status.ToString(),
-            Duration = job.Duration.HasValue ? $"{job.Duration.Value.TotalMinutes:F1}m" : "--",
-            Message = BuildJobMessage(job)
+            Type = GetBackupTypeLabel(job.BackupType),
+            Time = (job.EndTime ?? job.StartTime)?.ToLocalTime().ToString("HH:mm") ?? "--",
+            Status = GetJobStatusIcon(job.Status),
+            RawStatus = job.Status.ToString()
         }).ToList();
 
         dgvRecentJobs.DataSource = displayJobs;
 
-        if (dgvRecentJobs.Columns.Contains("EndTime"))
-            dgvRecentJobs.Columns["EndTime"].Visible = false;
-
-        if (dgvRecentJobs.Columns.Contains("StatusIcon"))
+        if (dgvRecentJobs.Columns.Contains("RawStatus"))
         {
-            dgvRecentJobs.Columns["StatusIcon"].HeaderText = string.Empty;
-            dgvRecentJobs.Columns["StatusIcon"].Width = 36;
+            dgvRecentJobs.Columns["RawStatus"].Visible = false;
         }
 
-        if (dgvRecentJobs.Columns.Contains("Message"))
-            dgvRecentJobs.Columns["Message"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+        if (dgvRecentJobs.Columns.Contains("Type"))
+        {
+            dgvRecentJobs.Columns["Type"].Width = 80;
+        }
 
-        // Color code rows by status
+        if (dgvRecentJobs.Columns.Contains("Time"))
+        {
+            dgvRecentJobs.Columns["Time"].Width = 72;
+        }
+
+        if (dgvRecentJobs.Columns.Contains("Status"))
+        {
+            dgvRecentJobs.Columns["Status"].Width = 70;
+        }
+
         foreach (DataGridViewRow row in dgvRecentJobs.Rows)
         {
-            var status = row.Cells["Status"].Value?.ToString();
+            var status = row.Cells["RawStatus"].Value?.ToString();
             if (status == "Completed")
             {
-                row.DefaultCellStyle.BackColor = Color.FromArgb(233, 247, 237);
+                row.DefaultCellStyle.BackColor = Color.FromArgb(236, 247, 236);
             }
             else if (status == "Failed")
             {
-                row.DefaultCellStyle.BackColor = Color.FromArgb(255, 232, 232);
+                row.DefaultCellStyle.BackColor = Color.FromArgb(253, 237, 237);
             }
-            else if (status == "Running")
+            else if (status == "InProgress" || status == "Running")
             {
-                row.DefaultCellStyle.BackColor = Color.FromArgb(255, 248, 220);
+                row.DefaultCellStyle.BackColor = Color.FromArgb(255, 247, 224);
             }
-
-            row.Height = 30;
         }
 
-        _panelTimeline?.Invalidate();
+        dgvRecentJobs.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+        dgvRecentJobs.DefaultCellStyle.Font = new Font("Segoe UI", 9F, FontStyle.Regular);
+        dgvRecentJobs.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
     }
 
     private void DisplayStorageStatus(StorageStatusSummary storage)
     {
         lblStoragePath.Text = $"Path: {storage.VolumePath}";
-        lblStorageSpace.Text = $"Free: {FormatBytes(storage.FreeBytes)} / {FormatBytes(storage.TotalBytes)} ({storage.FreePercentage:F1}%)";
-        lblStorageHealth.Text = $"Health: {storage.OverallHealth}";
-        lblStorageHealth.ForeColor = GetHealthColor(storage.OverallHealth);
+        lblStorageSpace.Text = $"Free: {FormatBytes(storage.FreeBytes)} ({storage.FreePercentage:F1}%)";
 
-        var estimate = TryExtractEstimatedNextFullBytes(storage);
-        var willFail = WillLikelyFailNextFull(storage, estimate);
+        var estimatedBytes = _estimatedNextFullBackupBytes;
+        lblEstimatedFullBackup.Text = estimatedBytes.HasValue
+            ? $"Next: {FormatBytes(estimatedBytes.Value)}"
+            : "Next: Unknown";
 
-        if (_lblStorageRiskFree != null)
-            _lblStorageRiskFree.Text = $"Free: {FormatBytes(storage.FreeBytes)}";
+        var prediction = GetStoragePrediction(storage, estimatedBytes);
+        lblStoragePrediction.Text = prediction == "WILL FAIL" ? "FAIL" : prediction;
+        lblStoragePrediction.ForeColor = prediction == "WILL FAIL"
+            ? Color.FromArgb(196, 43, 28)
+            : prediction == "OK"
+                ? Color.FromArgb(16, 124, 16)
+                : Color.Gray;
 
-        if (_lblStorageRiskEstimate != null)
-            _lblStorageRiskEstimate.Text = estimate.HasValue
-                ? $"Next FULL est: {FormatBytes(estimate.Value)}"
-                : "Next FULL est: -- (not provided)";
-
-        if (_lblStorageRiskPrediction != null)
-        {
-            _lblStorageRiskPrediction.Text = willFail ? "Status: WILL FAIL" : "Status: OK";
-            _lblStorageRiskPrediction.ForeColor = willFail ? Color.FromArgb(183, 28, 28) : Color.FromArgb(28, 106, 49);
-        }
-
-        // Update progress bar (inverted - shows used space)
         var usedPercentage = 100 - (int)storage.FreePercentage;
         progressBarStorage.Value = Math.Min(100, Math.Max(0, usedPercentage));
 
@@ -375,23 +317,43 @@ public partial class MonitoringDashboard : Form
             progressBarStorage.ForeColor = Color.Green;
         }
 
-        panelStorageStatus.BackColor = GetHealthBackgroundColor(storage.OverallHealth);
+        var storageHealth = prediction == "WILL FAIL" ? HealthStatus.Critical : storage.OverallHealth;
+        panelStorageStatus.BackColor = GetHealthBackgroundColor(storageHealth);
+    }
+
+    private void DisplayGlobalHeader(DashboardSnapshot snapshot)
+    {
+        var systemHealth = GetOverallSystemHealth(snapshot);
+        var systemIcon = systemHealth switch
+        {
+            HealthStatus.Critical => "❌",
+            HealthStatus.Warning => "⚠",
+            HealthStatus.Healthy => "✔",
+            _ => "?"
+        };
+        lblSystemStatus.Text = $"{systemIcon} {systemHealth.ToString().ToUpperInvariant()}";
+        lblSystemStatus.ForeColor = GetHealthColor(systemHealth);
+        lblNextRisk.Text = BuildNextRiskMessage(snapshot);
+    }
+
+    private void DisplayActionableAlert(
+        LastBackupStatus backupStatus,
+        StorageStatusSummary storageStatus,
+        ChainInitializationStatusSummary chainStatus)
+    {
+        var (message, action, health) = BuildActionableAlert(backupStatus, storageStatus, chainStatus, _estimatedNextFullBackupBytes);
+        lblAlertMessage.Text = message;
+        lblAlertAction.Text = $"-> {action}";
+        panelAlert.BackColor = GetHealthBackgroundColor(health);
     }
 
     private string FormatBackupTime(DateTime? backupTime)
     {
         if (!backupTime.HasValue)
-            return "Never";
+            return "--";
 
         var localTime = backupTime.Value.ToLocalTime();
-        var age = DateTime.UtcNow - backupTime.Value;
-
-        if (age.TotalHours < 1)
-            return $"{localTime:HH:mm:ss} ({age.TotalMinutes:F0}m ago)";
-        else if (age.TotalDays < 1)
-            return $"{localTime:HH:mm:ss} ({age.TotalHours:F1}h ago)";
-        else
-            return $"{localTime:yyyy-MM-dd HH:mm} ({age.TotalDays:F1}d ago)";
+        return localTime.ToString("HH:mm");
     }
 
     private string FormatBytes(long bytes)
@@ -429,6 +391,233 @@ public partial class MonitoringDashboard : Form
         };
     }
 
+    private static string GetHealthIcon(HealthStatus health)
+    {
+        return health switch
+        {
+            HealthStatus.Healthy => "OK",
+            HealthStatus.Warning => "!",
+            HealthStatus.Critical => "X",
+            _ => "?"
+        };
+    }
+
+    private static string GetBackupTypeLabel(BackupType backupType)
+    {
+        return backupType switch
+        {
+            BackupType.Full => "FULL",
+            BackupType.Differential => "DIFF",
+            BackupType.TransactionLog => "LOG",
+            _ => backupType.ToString().ToUpperInvariant()
+        };
+    }
+
+    private static string GetJobStatusIcon(BackupStatus status)
+    {
+        return status switch
+        {
+            BackupStatus.Completed => "✔",
+            BackupStatus.Failed => "❌",
+            BackupStatus.Running => "⚠",
+            _ => "•"
+        };
+    }
+
+    private static string BuildShortJobMessage(RecentJobSummary job)
+    {
+        if (job.Status == BackupStatus.Failed)
+        {
+            return string.IsNullOrWhiteSpace(job.ErrorMessage) ? "Backup failed" : "Backup failed - check job monitor";
+        }
+
+        if (job.Status == BackupStatus.Running)
+        {
+            return "Backup in progress";
+        }
+
+        return "Completed";
+    }
+
+    private static long? EstimateNextFullBackupSizeBytes(IEnumerable<RecentJobSummary> jobs)
+    {
+        var recentCompletedFull = jobs
+            .Where(j => j.BackupType == BackupType.Full && j.Status == BackupStatus.Completed && !string.IsNullOrWhiteSpace(j.FilePath))
+            .OrderByDescending(j => j.EndTime ?? j.StartTime)
+            .FirstOrDefault();
+
+        if (recentCompletedFull == null || string.IsNullOrWhiteSpace(recentCompletedFull.FilePath))
+        {
+            return null;
+        }
+
+        try
+        {
+            if (!File.Exists(recentCompletedFull.FilePath))
+            {
+                return null;
+            }
+
+            var fileInfo = new FileInfo(recentCompletedFull.FilePath);
+            if (fileInfo.Length <= 0)
+            {
+                return null;
+            }
+
+            // Add a modest growth headroom for prediction.
+            return (long)(fileInfo.Length * 1.15);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private string GetStoragePrediction(StorageStatusSummary storage, long? estimatedNextFullBackupBytes)
+    {
+        if (estimatedNextFullBackupBytes.HasValue)
+        {
+            return storage.FreeBytes >= estimatedNextFullBackupBytes.Value ? "OK" : "WILL FAIL";
+        }
+
+        return storage.OverallHealth switch
+        {
+            HealthStatus.Critical => "WILL FAIL",
+            HealthStatus.Healthy => "OK",
+            _ => "CHECK"
+        };
+    }
+
+    private static HealthStatus MaxHealth(HealthStatus left, HealthStatus right)
+    {
+        return (HealthStatus)Math.Max((int)left, (int)right);
+    }
+
+    private static HealthStatus GetOverallSystemHealth(DashboardSnapshot snapshot)
+    {
+        var health = MaxHealth(snapshot.LastBackupStatus.OverallHealth, snapshot.StorageStatus.OverallHealth);
+        if (snapshot.DatabasePulseStatus != null)
+        {
+            health = MaxHealth(health, snapshot.DatabasePulseStatus.Status);
+        }
+
+        if (snapshot.ChainInitializationStatus.IsInitialized == false)
+        {
+            health = MaxHealth(health, HealthStatus.Warning);
+        }
+
+        return health;
+    }
+
+    private string BuildNextRiskMessage(DashboardSnapshot snapshot)
+    {
+        var prediction = GetStoragePrediction(snapshot.StorageStatus, _estimatedNextFullBackupBytes);
+        if (prediction == "WILL FAIL")
+        {
+            return "Storage insufficient for next FULL backup";
+        }
+
+        var criticalIssue = snapshot.LastBackupStatus.CriticalIssues.FirstOrDefault();
+        if (!string.IsNullOrWhiteSpace(criticalIssue))
+        {
+            return criticalIssue;
+        }
+
+        var warning = snapshot.LastBackupStatus.Warnings.FirstOrDefault();
+        if (!string.IsNullOrWhiteSpace(warning))
+        {
+            return warning;
+        }
+
+        if (!string.IsNullOrWhiteSpace(snapshot.ChainInitializationStatus.WarningMessage))
+        {
+            return snapshot.ChainInitializationStatus.WarningMessage;
+        }
+
+        return "No immediate risk detected";
+    }
+
+    private static string BuildChainActionSuggestion(LastBackupStatus status)
+    {
+        if (!status.LastFullBackup.HasValue)
+        {
+            return "Action: run FULL backup now";
+        }
+
+        var critical = string.Join(' ', status.CriticalIssues).ToLowerInvariant();
+        if (critical.Contains("full"))
+        {
+            return "Action: run FULL backup immediately";
+        }
+
+        if (critical.Contains("log") || string.Join(' ', status.Warnings).ToLowerInvariant().Contains("log"))
+        {
+            return "Action: verify LOG schedule and SQL Agent jobs";
+        }
+
+        return status.OverallHealth switch
+        {
+            HealthStatus.Critical => "Action: intervene now and run validation backup",
+            HealthStatus.Warning => "Action: investigate warnings and verify next backup window",
+            _ => "Action: continue monitoring"
+        };
+    }
+
+    private (string Message, string Action, HealthStatus Health) BuildActionableAlert(
+        LastBackupStatus backupStatus,
+        StorageStatusSummary storageStatus,
+        ChainInitializationStatusSummary chainStatus,
+        long? estimatedNextFullBackupBytes)
+    {
+        if (!backupStatus.LastFullBackup.HasValue)
+        {
+            return (
+                "No full backup found",
+                "run FULL backup immediately",
+                HealthStatus.Critical);
+        }
+
+        var storagePrediction = GetStoragePrediction(storageStatus, estimatedNextFullBackupBytes);
+        if (storagePrediction == "WILL FAIL")
+        {
+            return (
+                "Storage insufficient for next FULL backup",
+                "free space or extend backup volume now",
+                HealthStatus.Critical);
+        }
+
+        var criticalIssue = backupStatus.CriticalIssues.FirstOrDefault();
+        if (!string.IsNullOrWhiteSpace(criticalIssue))
+        {
+            return (
+                criticalIssue,
+                "resolve failed/overdue backup job immediately",
+                HealthStatus.Critical);
+        }
+
+        if (chainStatus.IsInitialized == false)
+        {
+            return (
+                "Backup chain is not initialized",
+                "run an initial FULL backup",
+                HealthStatus.Warning);
+        }
+
+        var warning = backupStatus.Warnings.FirstOrDefault();
+        if (!string.IsNullOrWhiteSpace(warning))
+        {
+            return (
+                warning,
+                "inspect schedule and job history",
+                HealthStatus.Warning);
+        }
+
+        return (
+            "All monitored backup signals are healthy",
+            "no immediate action required",
+            HealthStatus.Healthy);
+    }
+
     private void DisplayDatabaseTopology()
     {
         lblDbName.Text = $"Database: {_databaseName}";
@@ -439,9 +628,6 @@ public partial class MonitoringDashboard : Form
         lblTopologyProdServer.Text = "Production DB Server: (see Agent configuration)";
         lblTopologyBackupServer.Text = $"Backup Storage Server: {backupServer}";
         lblTopologyDestinationPath.Text = $"Backup Destination: {_backupVolumePath}";
-
-        // Keep topology data available for operators while keeping the main dashboard focused.
-        panelBackupPolicy.Visible = false;
     }
 
     private void DisplayDatabasePulse(DatabasePulseStatus? pulse)
@@ -451,12 +637,16 @@ public partial class MonitoringDashboard : Form
             lblPulseStatus.Text = "Status: Unknown";
             lblPulseStatus.ForeColor = Color.Gray;
             lblPulseLastChecked.Text = "Last Checked: --";
+            lblDatabaseStatus.Text = "? Unknown";
+            lblDatabaseStatus.ForeColor = Color.Gray;
             return;
         }
 
         lblPulseStatus.Text = $"Status: {pulse.Status}";
         lblPulseStatus.ForeColor = GetHealthColor(pulse.Status);
         lblPulseLastChecked.Text = $"Last Checked: {pulse.LastCheckedUtc:yyyy-MM-dd HH:mm:ss} UTC";
+        lblDatabaseStatus.Text = pulse.Status == HealthStatus.Critical ? "❌ Down" : "✔ Online";
+        lblDatabaseStatus.ForeColor = GetHealthColor(pulse.Status);
 
         if (pulse.Status == HealthStatus.Critical && !string.IsNullOrWhiteSpace(pulse.ErrorMessage))
         {
@@ -494,595 +684,6 @@ public partial class MonitoringDashboard : Form
 
         lblChainInitializationWarning.Text = status.WarningMessage;
         lblChainInitializationWarning.ForeColor = string.IsNullOrWhiteSpace(status.WarningMessage) ? Color.Gray : Color.Red;
-
-        if (!string.IsNullOrWhiteSpace(status.WarningMessage) && _lblChainCardMessage != null)
-            _lblChainCardMessage.Text = status.WarningMessage;
-
-        if (status.IsInitialized == false && _lblChainCardAction != null)
-            _lblChainCardAction.Text = "Action: Run FULL backup to initialize chain.";
-    }
-
-    private void BuildOperationalLayout()
-    {
-        BackColor = _bgColor;
-        panelHeader.BackColor = _headerColor;
-        panelHeader.Height = 90;
-
-        lblTitle.Text = "Operational Backup Dashboard";
-        lblTitle.Font = new Font("Segoe UI", 15F, FontStyle.Bold);
-        lblTitle.Location = new Point(16, 8);
-
-        _lblGlobalStatus = new Label
-        {
-            AutoSize = false,
-            Name = "lblGlobalStatus",
-            Text = "UNKNOWN",
-            TextAlign = ContentAlignment.MiddleCenter,
-            ForeColor = Color.White,
-            BackColor = Color.FromArgb(110, 118, 129),
-            Font = new Font("Segoe UI", 11F, FontStyle.Bold),
-            Location = new Point(20, 46),
-            Size = new Size(120, 30)
-        };
-
-        _lblDatabaseSummary = new Label
-        {
-            AutoSize = false,
-            Name = "lblDatabaseSummary",
-            ForeColor = Color.Gainsboro,
-            Font = new Font("Segoe UI", 9.5F, FontStyle.Regular),
-            Location = new Point(152, 50),
-            Size = new Size(300, 24),
-            Text = "Databases: 1 total | 0 healthy | 0 warning | 0 critical"
-        };
-
-        _lblNextRisk = new Label
-        {
-            AutoSize = false,
-            Name = "lblNextRisk",
-            ForeColor = Color.White,
-            Font = new Font("Segoe UI", 10F, FontStyle.Bold),
-            Location = new Point(468, 50),
-            Size = new Size(470, 24),
-            Text = "Next Risk: --"
-        };
-
-        lblLastRefresh.Location = new Point(820, 14);
-        lblLastRefresh.Size = new Size(260, 22);
-
-        btnJobMonitor.Location = new Point(952, 46);
-        btnJobMonitor.Size = new Size(110, 30);
-        btnRefresh.Location = new Point(1070, 46);
-        btnRefresh.Size = new Size(110, 30);
-
-        panelHeader.Controls.Add(_lblGlobalStatus);
-        panelHeader.Controls.Add(_lblDatabaseSummary);
-        panelHeader.Controls.Add(_lblNextRisk);
-
-        _panelBody = new Panel
-        {
-            Dock = DockStyle.Fill,
-            Padding = new Padding(12),
-            BackColor = _bgColor
-        };
-
-        _layoutBody = new TableLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            ColumnCount = 3,
-            RowCount = 1,
-            BackColor = Color.Transparent
-        };
-        _layoutBody.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 28F));
-        _layoutBody.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 34F));
-        _layoutBody.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 38F));
-        _layoutBody.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-
-        _leftCards = new FlowLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            FlowDirection = FlowDirection.TopDown,
-            WrapContents = false,
-            AutoScroll = true,
-            Padding = new Padding(0),
-            Margin = new Padding(0)
-        };
-
-        ConfigureCard(panelLastBackupStatus, "Last Backup Status", 220);
-        ConfigureLastBackupCard();
-
-        _panelChainHealthCard = CreateCardPanel("Backup Chain Health", 150);
-        _lblChainCardStatus = CreateStatusLineLabel("Status: --", 36, 26, true);
-        _lblChainCardMessage = CreateStatusLineLabel("No chain message", 36, 62, false);
-        _lblChainCardAction = CreateStatusLineLabel("Action: --", 36, 92, false);
-        _panelChainHealthCard.Controls.Add(_lblChainCardStatus);
-        _panelChainHealthCard.Controls.Add(_lblChainCardMessage);
-        _panelChainHealthCard.Controls.Add(_lblChainCardAction);
-
-        ConfigureCard(panelStorageStatus, "Storage Risk", 180);
-        ConfigureStorageCard();
-
-        _panelAlert = CreateCardPanel("Actionable Alert", 125);
-        _lblAlertMessage = CreateStatusLineLabel("No active alert", 36, 38, true);
-        _lblAlertAction = CreateStatusLineLabel("Action: Monitor normal operation.", 36, 73, false);
-        _panelAlert.Controls.Add(_lblAlertMessage);
-        _panelAlert.Controls.Add(_lblAlertAction);
-
-        _leftCards.Controls.Add(panelLastBackupStatus);
-        _leftCards.Controls.Add(_panelChainHealthCard);
-        _leftCards.Controls.Add(panelStorageStatus);
-        _leftCards.Controls.Add(_panelAlert);
-
-        var centerColumn = new TableLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            ColumnCount = 1,
-            RowCount = 2,
-            Margin = new Padding(12, 0, 12, 0)
-        };
-        centerColumn.RowStyles.Add(new RowStyle(SizeType.Percent, 62F));
-        centerColumn.RowStyles.Add(new RowStyle(SizeType.Percent, 38F));
-
-        _panelTimeline = CreateCardPanel("Backup Timeline", 380);
-        _panelTimeline.Dock = DockStyle.Fill;
-        _panelTimeline.Paint += panelTimeline_Paint;
-        _lblTimelineLegend = new Label
-        {
-            AutoSize = false,
-            Font = new Font("Segoe UI", 9F, FontStyle.Regular),
-            ForeColor = Color.DimGray,
-            Location = new Point(20, 38),
-            Size = new Size(500, 24),
-            Text = "FULL (Blue)   DIFF (Teal)   LOG (Orange)   Failed jobs are marked in red"
-        };
-        _panelTimeline.Controls.Add(_lblTimelineLegend);
-
-        ConfigureCard(panelDatabaseTopology, "Environment Overview", 220);
-        ConfigureTopologyCard();
-
-        centerColumn.Controls.Add(_panelTimeline, 0, 0);
-        centerColumn.Controls.Add(panelDatabaseTopology, 0, 1);
-
-        ConfigureCard(panelRecentJobs, "Recent Jobs", 560);
-        panelRecentJobs.Dock = DockStyle.Fill;
-        panelRecentJobs.Margin = new Padding(0);
-        lblRecentJobsTitle.Visible = false;
-        dgvRecentJobs.Location = new Point(16, 44);
-        dgvRecentJobs.Size = new Size(panelRecentJobs.Width - 32, panelRecentJobs.Height - 60);
-        dgvRecentJobs.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
-
-        _layoutBody.Controls.Add(_leftCards, 0, 0);
-        _layoutBody.Controls.Add(centerColumn, 1, 0);
-        _layoutBody.Controls.Add(panelRecentJobs, 2, 0);
-        _panelBody.Controls.Add(_layoutBody);
-
-        Controls.Remove(panelLastBackupStatus);
-        Controls.Remove(panelStorageStatus);
-        Controls.Remove(panelDatabaseTopology);
-        Controls.Remove(panelRecentJobs);
-        Controls.Remove(panelBackupPolicy);
-
-        Controls.Add(panelBackupPolicy);
-        Controls.Add(_panelBody);
-
-        panelBackupPolicy.Visible = false;
-    }
-
-    private void ConfigureCard(Panel panel, string title, int height)
-    {
-        panel.Dock = DockStyle.Top;
-        panel.Height = height;
-        panel.BackColor = _cardColor;
-        panel.Padding = new Padding(CardPadding);
-        panel.Margin = new Padding(0, 0, 0, 12);
-        panel.BorderStyle = BorderStyle.FixedSingle;
-
-        var titleLabel = new Label
-        {
-            Text = title,
-            AutoSize = true,
-            Font = new Font("Segoe UI", 11F, FontStyle.Bold),
-            ForeColor = Color.FromArgb(31, 41, 55),
-            Location = new Point(12, 10),
-            BackColor = Color.Transparent
-        };
-
-        panel.Controls.Add(titleLabel);
-        titleLabel.BringToFront();
-    }
-
-    private Panel CreateCardPanel(string title, int height)
-    {
-        var panel = new Panel
-        {
-            Height = height,
-            Dock = DockStyle.Top,
-            BackColor = _cardColor,
-            Padding = new Padding(CardPadding),
-            Margin = new Padding(0, 0, 0, 12),
-            BorderStyle = BorderStyle.FixedSingle
-        };
-
-        var titleLabel = new Label
-        {
-            Text = title,
-            AutoSize = true,
-            Font = new Font("Segoe UI", 11F, FontStyle.Bold),
-            ForeColor = Color.FromArgb(31, 41, 55),
-            Location = new Point(12, 10)
-        };
-        panel.Controls.Add(titleLabel);
-        return panel;
-    }
-
-    private Label CreateStatusLineLabel(string text, int x, int y, bool emphasize)
-    {
-        return new Label
-        {
-            AutoSize = false,
-            Location = new Point(x, y),
-            Size = new Size(500, emphasize ? 26 : 22),
-            Font = emphasize ? new Font("Segoe UI", 10F, FontStyle.Bold) : new Font("Segoe UI", 9.5F, FontStyle.Regular),
-            ForeColor = Color.FromArgb(17, 24, 39),
-            Text = text
-        };
-    }
-
-    private void ConfigureLastBackupCard()
-    {
-        lblLastBackupTitle.Visible = false;
-        lstWarnings.Visible = false;
-
-        lblFullBackup.Location = new Point(16, 44);
-        lblDiffBackup.Location = new Point(16, 78);
-        lblLogBackup.Location = new Point(16, 112);
-        lblChainHealth.Location = new Point(16, 150);
-
-        lblFullBackup.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
-        lblDiffBackup.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
-        lblLogBackup.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
-        lblChainHealth.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
-
-        lblFullBackup.AutoSize = true;
-        lblDiffBackup.AutoSize = true;
-        lblLogBackup.AutoSize = true;
-        lblChainHealth.AutoSize = true;
-    }
-
-    private void ConfigureStorageCard()
-    {
-        lblStorageTitle.Visible = false;
-        lblStoragePath.Visible = false;
-        progressBarStorage.Visible = false;
-
-        lblStorageSpace.Location = new Point(16, 44);
-        lblStorageHealth.Location = new Point(16, 74);
-        lblStorageSpace.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
-        lblStorageHealth.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
-
-        _lblStorageRiskFree = CreateStatusLineLabel("Free: --", 16, 104, false);
-        _lblStorageRiskEstimate = CreateStatusLineLabel("Next FULL est: --", 16, 124, false);
-        _lblStorageRiskPrediction = CreateStatusLineLabel("Status: --", 16, 146, true);
-
-        panelStorageStatus.Controls.Add(_lblStorageRiskFree);
-        panelStorageStatus.Controls.Add(_lblStorageRiskEstimate);
-        panelStorageStatus.Controls.Add(_lblStorageRiskPrediction);
-    }
-
-    private void ConfigureTopologyCard()
-    {
-        lblDatabaseTopologyTitle.Visible = false;
-
-        var labels = new[]
-        {
-            lblDbName,
-            lblDbServer,
-            lblDbRecoveryModel,
-            lblTopologyProdServer,
-            lblTopologyBackupServer,
-            lblTopologyDestinationPath,
-            lblPulseStatus,
-            lblPulseLastChecked,
-            lblChainInitialized,
-            lblLastValidFullBackup,
-            lblRestoreChainHealthSimple,
-            lblChainInitializationWarning
-        };
-
-        var y = 42;
-        foreach (var label in labels)
-        {
-            label.Location = new Point(16, y);
-            label.Width = panelDatabaseTopology.Width - 32;
-            y += label == lblLastValidFullBackup || label == lblChainInitializationWarning ? 34 : 20;
-        }
-
-        lblPulseStatus.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
-        lblChainInitialized.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
-        lblRestoreChainHealthSimple.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
-    }
-
-    private void ConfigureRecentJobsGrid()
-    {
-        dgvRecentJobs.BorderStyle = BorderStyle.None;
-        dgvRecentJobs.BackgroundColor = Color.White;
-        dgvRecentJobs.EnableHeadersVisualStyles = false;
-        dgvRecentJobs.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None;
-        dgvRecentJobs.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(230, 236, 245);
-        dgvRecentJobs.ColumnHeadersDefaultCellStyle.ForeColor = Color.FromArgb(31, 41, 55);
-        dgvRecentJobs.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
-        dgvRecentJobs.DefaultCellStyle.Font = new Font("Segoe UI", 9.5F, FontStyle.Regular);
-        dgvRecentJobs.DefaultCellStyle.SelectionBackColor = Color.FromArgb(212, 227, 248);
-        dgvRecentJobs.DefaultCellStyle.SelectionForeColor = Color.FromArgb(17, 24, 39);
-        dgvRecentJobs.CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal;
-        dgvRecentJobs.GridColor = Color.FromArgb(235, 239, 244);
-        dgvRecentJobs.RowTemplate.Height = 30;
-    }
-
-    private void DisplayGlobalHeader(DashboardSnapshot snapshot)
-    {
-        var chainHealth = snapshot.ChainInitializationStatus.RestoreChainHealth.Equals("Unhealthy", StringComparison.OrdinalIgnoreCase)
-            ? HealthStatus.Critical
-            : snapshot.LastBackupStatus.OverallHealth;
-
-        var pulseHealth = snapshot.DatabasePulseStatus?.Status ?? HealthStatus.Warning;
-        var overall = GetWorstHealth(snapshot.LastBackupStatus.OverallHealth, snapshot.StorageStatus.OverallHealth, pulseHealth, chainHealth);
-
-        if (_lblGlobalStatus != null)
-        {
-            _lblGlobalStatus.Text = StatusBadgeText(overall);
-            _lblGlobalStatus.BackColor = GetHealthColor(overall);
-        }
-
-        if (_lblDatabaseSummary != null)
-        {
-            var healthy = overall == HealthStatus.Healthy ? 1 : 0;
-            var warning = overall == HealthStatus.Warning ? 1 : 0;
-            var critical = overall == HealthStatus.Critical ? 1 : 0;
-            _lblDatabaseSummary.Text = $"Databases: 1 total | {healthy} healthy | {warning} warning | {critical} critical";
-        }
-
-        if (_lblNextRisk != null)
-            _lblNextRisk.Text = $"Next Risk: {BuildNextRisk(snapshot)}";
-    }
-
-    private void DisplayActionableAlert(DashboardSnapshot snapshot)
-    {
-        if (_lblAlertMessage == null || _lblAlertAction == null || _panelAlert == null)
-            return;
-
-        var alert = BuildTopAlert(snapshot);
-        _lblAlertMessage.Text = alert.message;
-        _lblAlertAction.Text = $"Action: {alert.action}";
-        _lblAlertMessage.ForeColor = GetHealthColor(alert.health);
-        _panelAlert.BackColor = GetHealthBackgroundColor(alert.health);
-    }
-
-    private (HealthStatus health, string message, string action) BuildTopAlert(DashboardSnapshot snapshot)
-    {
-        if (snapshot.LastBackupStatus.CriticalIssues.Count > 0)
-        {
-            return (HealthStatus.Critical, snapshot.LastBackupStatus.CriticalIssues[0], "Run FULL backup immediately.");
-        }
-
-        if (!snapshot.ChainInitializationStatus.IsInitialized.GetValueOrDefault(true))
-        {
-            return (HealthStatus.Critical, "Backup chain is not initialized.", "Run FULL backup now to initialize restore chain.");
-        }
-
-        if (snapshot.StorageStatus.CriticalIssues.Count > 0)
-        {
-            return (HealthStatus.Critical, snapshot.StorageStatus.CriticalIssues[0], "Free up space or expand backup volume before next FULL backup.");
-        }
-
-        if (snapshot.LastBackupStatus.Warnings.Count > 0)
-        {
-            return (HealthStatus.Warning, snapshot.LastBackupStatus.Warnings[0], "Review warning and run missed backup job.");
-        }
-
-        return (HealthStatus.Healthy, "All backup monitors are healthy.", "No immediate action required.");
-    }
-
-    private string BuildNextRisk(DashboardSnapshot snapshot)
-    {
-        var storageCritical = snapshot.StorageStatus.CriticalIssues.FirstOrDefault();
-        if (!string.IsNullOrWhiteSpace(storageCritical))
-            return storageCritical;
-
-        var backupCritical = snapshot.LastBackupStatus.CriticalIssues.FirstOrDefault();
-        if (!string.IsNullOrWhiteSpace(backupCritical))
-            return backupCritical;
-
-        var storageWarn = snapshot.StorageStatus.Warnings.FirstOrDefault();
-        if (!string.IsNullOrWhiteSpace(storageWarn))
-            return storageWarn;
-
-        var backupWarn = snapshot.LastBackupStatus.Warnings.FirstOrDefault();
-        if (!string.IsNullOrWhiteSpace(backupWarn))
-            return backupWarn;
-
-        return "No immediate risk detected.";
-    }
-
-    private void panelTimeline_Paint(object? sender, PaintEventArgs e)
-    {
-        if (_panelTimeline == null)
-            return;
-
-        var g = e.Graphics;
-        g.SmoothingMode = SmoothingMode.AntiAlias;
-
-        var chartRect = new Rectangle(20, 70, _panelTimeline.ClientSize.Width - 40, _panelTimeline.ClientSize.Height - 95);
-        if (chartRect.Width <= 40 || chartRect.Height <= 40)
-            return;
-
-        using var axisPen = new Pen(Color.FromArgb(205, 213, 224), 1);
-        using var fullBrush = new SolidBrush(Color.FromArgb(52, 102, 179));
-        using var diffBrush = new SolidBrush(Color.FromArgb(47, 167, 163));
-        using var logBrush = new SolidBrush(Color.FromArgb(235, 137, 52));
-        using var failBrush = new SolidBrush(Color.FromArgb(183, 28, 28));
-
-        g.DrawRectangle(axisPen, chartRect);
-
-        if (_timelineJobs.Count == 0)
-        {
-            using var noDataBrush = new SolidBrush(Color.Gray);
-            g.DrawString("No recent backup events", new Font("Segoe UI", 10F, FontStyle.Italic), noDataBrush, chartRect.Left + 12, chartRect.Top + 12);
-            return;
-        }
-
-        var minTime = _timelineJobs.Min(j => j.StartTime!.Value);
-        var maxTime = _timelineJobs.Max(j => j.StartTime!.Value);
-        if (minTime == maxTime)
-            maxTime = maxTime.AddMinutes(1);
-
-        var lanes = new Dictionary<BackupType, int>
-        {
-            [BackupType.Full] = chartRect.Top + 25,
-            [BackupType.Differential] = chartRect.Top + (chartRect.Height / 2),
-            [BackupType.TransactionLog] = chartRect.Bottom - 25
-        };
-
-        using var textBrush = new SolidBrush(Color.FromArgb(74, 85, 104));
-        g.DrawString("FULL", new Font("Segoe UI", 8F, FontStyle.Bold), textBrush, chartRect.Left + 6, lanes[BackupType.Full] - 10);
-        g.DrawString("DIFF", new Font("Segoe UI", 8F, FontStyle.Bold), textBrush, chartRect.Left + 6, lanes[BackupType.Differential] - 10);
-        g.DrawString("LOG", new Font("Segoe UI", 8F, FontStyle.Bold), textBrush, chartRect.Left + 6, lanes[BackupType.TransactionLog] - 10);
-
-        foreach (var lane in lanes.Values)
-        {
-            g.DrawLine(axisPen, chartRect.Left + 45, lane, chartRect.Right - 8, lane);
-        }
-
-        foreach (var job in _timelineJobs)
-        {
-            if (!job.StartTime.HasValue || !lanes.ContainsKey(job.BackupType))
-                continue;
-
-            var ratio = (job.StartTime.Value - minTime).TotalSeconds / (maxTime - minTime).TotalSeconds;
-            var x = chartRect.Left + 50 + (int)((chartRect.Width - 66) * ratio);
-            var y = lanes[job.BackupType];
-
-            var brush = job.Status == BackupStatus.Failed
-                ? failBrush
-                : job.BackupType switch
-                {
-                    BackupType.Full => fullBrush,
-                    BackupType.Differential => diffBrush,
-                    _ => logBrush
-                };
-
-            g.FillEllipse(brush, x - 4, y - 4, 8, 8);
-        }
-
-        var rangeText = $"{minTime.ToLocalTime():MM-dd HH:mm} - {maxTime.ToLocalTime():MM-dd HH:mm}";
-        g.DrawString(rangeText, new Font("Segoe UI", 8F, FontStyle.Regular), textBrush, chartRect.Left + 45, chartRect.Bottom + 6);
-    }
-
-    private static string BuildJobMessage(RecentJobSummary job)
-    {
-        if (job.Status == BackupStatus.Failed)
-            return string.IsNullOrWhiteSpace(job.ErrorMessage) ? "Failed" : job.ErrorMessage;
-
-        if (job.Status == BackupStatus.Running)
-            return "Job in progress";
-
-        return "Completed";
-    }
-
-    private static string GetStatusIcon(BackupStatus status)
-    {
-        return status switch
-        {
-            BackupStatus.Completed => "[OK]",
-            BackupStatus.Failed => "[X]",
-            BackupStatus.Running => "[!]",
-            _ => "[?]"
-        };
-    }
-
-    private static string StatusBadgeText(HealthStatus health)
-    {
-        return health switch
-        {
-            HealthStatus.Healthy => "HEALTHY",
-            HealthStatus.Warning => "WARNING",
-            HealthStatus.Critical => "CRITICAL",
-            _ => "UNKNOWN"
-        };
-    }
-
-    private static string BuildChainMessage(LastBackupStatus status)
-    {
-        if (status.CriticalIssues.Count > 0)
-            return status.CriticalIssues[0];
-
-        if (status.Warnings.Count > 0)
-            return status.Warnings[0];
-
-        return status.ChainHealthSummary;
-    }
-
-    private static string BuildChainAction(LastBackupStatus status)
-    {
-        if (status.CriticalIssues.Count > 0)
-            return "Action: Run FULL backup now and validate restore chain.";
-
-        if (status.Warnings.Count > 0)
-            return "Action: Run pending backup job and monitor next cycle.";
-
-        return "Action: Continue normal monitoring.";
-    }
-
-    private static long? TryExtractEstimatedNextFullBytes(StorageStatusSummary storage)
-    {
-        var sourceMessages = storage.CriticalIssues.Concat(storage.Warnings);
-
-        foreach (var message in sourceMessages)
-        {
-            var match = Regex.Match(message, @"(\d+(?:\.\d+)?)\s*(TB|GB|MB)", RegexOptions.IgnoreCase);
-            if (!match.Success)
-                continue;
-
-            if (!double.TryParse(match.Groups[1].Value, out var numeric))
-                continue;
-
-            var unit = match.Groups[2].Value.ToUpperInvariant();
-            var multiplier = unit switch
-            {
-                "TB" => 1024d * 1024d * 1024d * 1024d,
-                "GB" => 1024d * 1024d * 1024d,
-                "MB" => 1024d * 1024d,
-                _ => 1d
-            };
-
-            return (long)(numeric * multiplier);
-        }
-
-        return null;
-    }
-
-    private static bool WillLikelyFailNextFull(StorageStatusSummary storage, long? estimate)
-    {
-        if (storage.OverallHealth == HealthStatus.Critical)
-            return true;
-
-        if (estimate.HasValue && storage.FreeBytes < estimate.Value)
-            return true;
-
-        return storage.CriticalIssues.Any(issue => issue.Contains("insufficient", StringComparison.OrdinalIgnoreCase)
-            || issue.Contains("not enough", StringComparison.OrdinalIgnoreCase)
-            || issue.Contains("fail", StringComparison.OrdinalIgnoreCase));
-    }
-
-    private static HealthStatus GetWorstHealth(params HealthStatus[] statuses)
-    {
-        if (statuses.Any(s => s == HealthStatus.Critical))
-            return HealthStatus.Critical;
-
-        if (statuses.Any(s => s == HealthStatus.Warning))
-            return HealthStatus.Warning;
-
-        return HealthStatus.Healthy;
     }
 
     private static string ResolveBackupStorageServer(string destinationPath)
@@ -1098,5 +699,26 @@ public partial class MonitoringDashboard : Form
         }
 
         return "Local or direct-attached storage";
+    }
+
+    private static string GetBackupStateIcon(DateTime? backupTime)
+    {
+        return backupTime.HasValue ? "✔" : "❌";
+    }
+
+    private static string ToCompactSchedule(string scheduleText)
+    {
+        if (string.IsNullOrWhiteSpace(scheduleText))
+        {
+            return "--";
+        }
+
+        var separatorIndex = scheduleText.IndexOf(':');
+        var compact = separatorIndex >= 0
+            ? scheduleText[(separatorIndex + 1)..]
+            : scheduleText;
+
+        compact = compact.Trim();
+        return compact.Length <= 18 ? compact : compact[..18];
     }
 }
