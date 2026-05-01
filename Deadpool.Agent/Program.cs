@@ -5,17 +5,14 @@ using Deadpool.Agent.Workers;
 using Deadpool.Core.Domain.ValueObjects;
 using Deadpool.Core.Interfaces;
 using Deadpool.Core.Services;
-using Deadpool.Infrastructure.BackupExecution;
 using Deadpool.Infrastructure.FileCopy;
-using Deadpool.Infrastructure.Metadata;
 using Deadpool.Infrastructure.Persistence;
 using Deadpool.Infrastructure.Scheduling;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 
 var builder = Host.CreateApplicationBuilder(args);
 
-var baseDir = AppDomain.CurrentDomain.BaseDirectory;
+var baseDir = "c:\\ics\\deadpool";
 
 var current = new DirectoryInfo(baseDir);
 

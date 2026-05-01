@@ -83,6 +83,21 @@ public sealed class BackupExecutionWorker : BackgroundService
                 return;
             }
 
+            if (job.Status == BackupStatus.Pending)
+            {
+                job.MarkAsRunning();
+                await _jobRepository.UpdateAsync(job);
+            }
+            else if (job.Status != BackupStatus.Running)
+            {
+                _logger.LogWarning(
+                    "Skipping execution for {Database} {Type}. Invalid job status: {Status}",
+                    job.DatabaseName,
+                    job.BackupType,
+                    job.Status);
+                return;
+            }
+
             _logger.LogInformation(
                 "Executing {Type} backup for {Database}",
                 job.BackupType, job.DatabaseName);
@@ -95,6 +110,12 @@ public sealed class BackupExecutionWorker : BackgroundService
 
             // Execute backup directly
             await ExecuteBackupAsync(job.DatabaseName, job.BackupType, backupFilePath);
+
+            // Verify backup before marking completion
+            var isVerified = await _backupExecutor.VerifyBackupFileAsync(backupFilePath);
+            if (!isVerified)
+                throw new InvalidOperationException(
+                    $"Backup verification failed for database '{job.DatabaseName}' ({job.BackupType}).");
 
             // Get file size and mark completed
             var fileSize = GetBackupFileSize(backupFilePath);
