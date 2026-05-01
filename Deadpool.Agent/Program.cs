@@ -162,20 +162,28 @@ builder.Services.AddSingleton<IStorageMonitoringService>(sp =>
 });
 
 // Backup file copy service (conditional registration based on configuration)
-var copyOptions = builder.Configuration.GetSection("BackupCopy").Get<BackupCopyOptions>();
+var copyOptions = builder.Configuration.GetSection("BackupCopy").Get<BackupCopyOptions>()
+    ?? new BackupCopyOptions();
 var backupStorageOptions = builder.Configuration.GetSection("BackupStorage").Get<BackupStorageOptions>()
     ?? new BackupStorageOptions();
-if (copyOptions?.Enabled == true)
+var configuredRemoteStoragePath = !string.IsNullOrWhiteSpace(copyOptions.RemoteStoragePath)
+    ? copyOptions.RemoteStoragePath
+    : backupStorageOptions.StorageFolder;
+var isCopyEnabled = copyOptions.Enabled ?? !string.IsNullOrWhiteSpace(configuredRemoteStoragePath);
+
+if (isCopyEnabled && !string.IsNullOrWhiteSpace(configuredRemoteStoragePath))
 {
     builder.Services.AddSingleton<IBackupFileCopyService>(sp =>
     {
         var logger = sp.GetRequiredService<ILogger<BackupFileCopyService>>();
         return new BackupFileCopyService(
             logger,
-            backupStorageOptions.StorageFolder,
+            configuredRemoteStoragePath,
             copyOptions.MaxRetryAttempts,
             copyOptions.RetryDelay);
     });
+
+    builder.Services.AddHostedService<BackupCopyWorker>();
 }
 
 // BackupFilePathService

@@ -23,11 +23,85 @@ public class BackupFileCopyService : IBackupFileCopyService
 
     public async Task CopyBackupFileAsync(string sourceFilePath, string databaseName, CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Copying backup file {Source} to remote storage", sourceFilePath);
+        if (string.IsNullOrWhiteSpace(sourceFilePath))
+            throw new ArgumentException("Source file path cannot be empty.", nameof(sourceFilePath));
 
-        await Task.Delay(100, cancellationToken);
+        if (string.IsNullOrWhiteSpace(_remoteStoragePath))
+            throw new InvalidOperationException("Remote storage path is not configured.");
 
-        _logger.LogInformation("Backup file copied successfully");
+        if (!File.Exists(sourceFilePath))
+            throw new FileNotFoundException($"Source backup file not found: {sourceFilePath}", sourceFilePath);
+
+        Directory.CreateDirectory(_remoteStoragePath);
+
+        var destinationFilePath = Path.Combine(_remoteStoragePath, Path.GetFileName(sourceFilePath));
+        var attempts = Math.Max(1, _maxRetryAttempts);
+
+        for (var attempt = 1; attempt <= attempts; attempt++)
+        {
+            try
+            {
+                _logger.LogInformation(
+                    "Copying backup file for {Database}. Source: {Source}. Destination: {Destination}. Attempt {Attempt}/{Attempts}",
+                    databaseName,
+                    sourceFilePath,
+                    destinationFilePath,
+                    attempt,
+                    attempts);
+
+                await using var sourceStream = new FileStream(
+                    sourceFilePath,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.Read,
+                    bufferSize: 81920,
+                    useAsync: true);
+
+                await using var destinationStream = new FileStream(
+                    destinationFilePath,
+                    FileMode.Create,
+                    FileAccess.Write,
+                    FileShare.None,
+                    bufferSize: 81920,
+                    useAsync: true);
+
+                await sourceStream.CopyToAsync(destinationStream, cancellationToken);
+
+                _logger.LogInformation(
+                    "Backup file copy completed for {Database}. Destination: {Destination}",
+                    databaseName,
+                    destinationFilePath);
+
+                return;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                if (attempt >= attempts)
+                {
+                    _logger.LogError(
+                        ex,
+                        "Backup file copy failed for {Database}. Source: {Source}. DestinationRoot: {DestinationRoot}",
+                        databaseName,
+                        sourceFilePath,
+                        _remoteStoragePath);
+                    throw;
+                }
+
+                _logger.LogWarning(
+                    ex,
+                    "Backup file copy attempt {Attempt}/{Attempts} failed for {Database}. Retrying in {RetryDelay}",
+                    attempt,
+                    attempts,
+                    databaseName,
+                    _retryDelay);
+
+                await Task.Delay(_retryDelay, cancellationToken);
+            }
+        }
     }
 }
             
