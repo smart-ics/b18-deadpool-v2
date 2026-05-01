@@ -120,6 +120,12 @@ static class Program
             return new SqliteDatabasePulseRepository(sqlitePath, logger);
         });
 
+        services.AddSingleton<IAgentHeartbeatRepository>(sp =>
+        {
+            var logger = sp.GetRequiredService<ILogger<SqliteAgentHeartbeatRepository>>();
+            return new SqliteAgentHeartbeatRepository(sqlitePath, logger);
+        });
+
         // Core dashboard services
         services.AddSingleton<IDashboardMonitoringService, DashboardMonitoringService>();
         services.AddSingleton<IBackupJobMonitoringService, BackupJobMonitoringService>();

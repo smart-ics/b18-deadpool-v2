@@ -22,19 +22,27 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
                 <TextBlock Grid.Row="0"
                            FontSize="20"
                            FontWeight="Bold"
-                           Foreground="{StaticResource RedBrush}"
-                           Text="CRITICAL - STORAGE FAILURE IMMINENT" />
+                           Foreground="{Binding HeaderStatusBrush}"
+                           Text="{Binding HeaderPrimaryText}" />
 
                 <TextBlock Grid.Row="1"
                            Margin="0,4,0,0"
                            FontSize="11"
                            Foreground="{StaticResource MutedTextBrush}"
-                           Text="Last update: 10:25" />
+                           Text="{Binding HeaderSecondaryText}" />
+
+                <TextBlock Grid.Row="2"
+                           Margin="0,4,0,0"
+                           FontSize="12"
+                           FontWeight="SemiBold"
+                           Foreground="{StaticResource TextBrush}"
+                           Text="{Binding AgentStatusDisplay}" />
             </Grid>
         </Border>
 
@@ -51,27 +59,27 @@
 
             <controls:StatusCard Grid.Column="0"
                                  Title="Last Backup"
-                                 StatusText="FULL / DIFF / LOG"
-                                 DetailText="FULL ✔ 10:25   DIFF ✔ 10:26   LOG ✔ 10:26"
-                                 StatusColor="{StaticResource GreenBrush}" />
+                                 StatusText="{Binding LastBackupStatusText}"
+                                 DetailText="{Binding LastBackupDetailText}"
+                                 StatusColor="{Binding LastBackupStatusBrush}" />
 
             <controls:StatusCard Grid.Column="2"
                                  Title="Chain Health"
-                                 StatusText="CRITICAL"
-                                 DetailText="Restore chain broken"
-                                 StatusColor="{StaticResource RedBrush}" />
+                                 StatusText="{Binding ChainHealthStatusText}"
+                                 DetailText="{Binding ChainHealthDetailText}"
+                                 StatusColor="{Binding ChainHealthStatusBrush}" />
 
             <controls:StatusCard Grid.Column="4"
                                  Title="Storage"
-                                 StatusText="WILL FAIL"
-                                 DetailText="Free: 15GB&#x0a;Next: 45GB ❌&#x0a;Exhaustion: ~2h"
-                                 StatusColor="{StaticResource YellowBrush}" />
+                                 StatusText="{Binding StorageStatusText}"
+                                 DetailText="{Binding StorageDetailText}"
+                                 StatusColor="{Binding StorageStatusBrush}" />
 
             <controls:StatusCard Grid.Column="6"
                                  Title="Database"
-                                 StatusText="ONLINE"
-                                 DetailText="Instance: PROD-SQL-01"
-                                 StatusColor="{StaticResource GreenBrush}" />
+                                 StatusText="{Binding DatabaseStatusText}"
+                                 DetailText="{Binding DatabaseDetailText}"
+                                 StatusColor="{Binding DatabaseStatusBrush}" />
         </Grid>
 
         <Grid Grid.Row="2">
@@ -145,26 +153,18 @@
                                Text="Alerts" />
 
                     <StackPanel Grid.Row="1">
-                        <Border Style="{StaticResource AlertItemBorderStyle}">
-                            <StackPanel>
-                                <TextBlock Style="{StaticResource AlertMessageTextStyle}" Foreground="{StaticResource RedBrush}" Text="❌ No FULL backup" />
-                                <TextBlock Margin="0,3,0,0" Style="{StaticResource AlertActionTextStyle}" Text="👉 RUN FULL NOW" />
-                            </StackPanel>
-                        </Border>
-
-                        <Border Style="{StaticResource AlertItemBorderStyle}">
-                            <StackPanel>
-                                <TextBlock Style="{StaticResource AlertMessageTextStyle}" Foreground="{StaticResource YellowBrush}" Text="⚠ Storage pressure high" />
-                                <TextBlock Margin="0,3,0,0" Style="{StaticResource AlertActionTextStyle}" Text="👉 PURGE OLD CHAINS" />
-                            </StackPanel>
-                        </Border>
-
-                        <Border Style="{StaticResource AlertItemBorderStyle}" Margin="0">
-                            <StackPanel>
-                                <TextBlock Style="{StaticResource AlertMessageTextStyle}" Foreground="{StaticResource RedBrush}" Text="❌ Restore risk" />
-                                <TextBlock Margin="0,3,0,0" Style="{StaticResource AlertActionTextStyle}" Text="👉 VERIFY BACKUP ORDER" />
-                            </StackPanel>
-                        </Border>
+                        <ItemsControl ItemsSource="{Binding Alerts}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Style="{StaticResource AlertItemBorderStyle}">
+                                        <StackPanel>
+                                            <TextBlock Style="{StaticResource AlertMessageTextStyle}" Text="{Binding Message}" />
+                                            <TextBlock Margin="0,3,0,0" Style="{StaticResource AlertActionTextStyle}" Text="{Binding Action}" />
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
                     </StackPanel>
                 </Grid>
             </Border>

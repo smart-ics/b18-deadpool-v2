@@ -96,6 +96,11 @@ builder.Services.AddSingleton<IDatabasePulseRepository>(sp =>
     var logger = sp.GetRequiredService<ILogger<SqliteDatabasePulseRepository>>();
     return new SqliteDatabasePulseRepository(sqlitePath, logger);
 });
+builder.Services.AddSingleton<IAgentHeartbeatRepository>(sp =>
+{
+    var logger = sp.GetRequiredService<ILogger<SqliteAgentHeartbeatRepository>>();
+    return new SqliteAgentHeartbeatRepository(sqlitePath, logger);
+});
 builder.Services.AddSingleton<IScheduleTracker, InMemoryScheduleTracker>();
 
 // Storage monitoring dependencies
@@ -198,6 +203,7 @@ builder.Services.AddHostedService<BackupExecutionWorker>();
 builder.Services.AddHostedService<BackupHealthMonitoringWorker>();
 builder.Services.AddHostedService<StorageMonitoringWorker>();
 builder.Services.AddHostedService<DatabasePulseWorker>();
+builder.Services.AddHostedService<AgentHeartbeatWorker>();
 
 var host = builder.Build();
 var startupLogger = host.Services.GetRequiredService<ILoggerFactory>().CreateLogger("ProductionSqlStartup");
