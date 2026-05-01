@@ -19,7 +19,7 @@ static class Program
     {
         ApplicationConfiguration.Initialize();
 
-        var baseDir = AppDomain.CurrentDomain.BaseDirectory;
+        var baseDir = "c:\\ics\\deadpool";
 
         var current = new DirectoryInfo(baseDir);
 
