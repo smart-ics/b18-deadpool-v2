@@ -3,15 +3,15 @@ using Deadpool.Core.Domain.ValueObjects;
 namespace Deadpool.Core.Interfaces;
 
 /// <summary>
-/// Executes restore operations and enforces mandatory restore plan validation beforehand.
+/// Executes restore script commands for a restore plan.
 /// </summary>
 public interface IRestoreExecutionService
 {
     /// <summary>
-    /// Executes a restore pipeline delegate only after validation succeeds.
+    /// Executes restore commands sequentially and stops on first failure.
     /// </summary>
-    Task ExecuteAsync(
+    Task<RestoreExecutionResult> ExecuteAsync(
         RestorePlan plan,
-        Func<RestorePlan, CancellationToken, Task> executeRestoreAsync,
+        bool allowOverwrite,
         CancellationToken cancellationToken = default);
 }

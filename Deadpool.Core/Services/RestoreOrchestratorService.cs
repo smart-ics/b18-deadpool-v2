@@ -45,10 +45,30 @@ public sealed class RestoreOrchestratorService : IRestoreOrchestratorService
             throw new InvalidOperationException(message);
         }
 
-        await _executor.ExecuteAsync(
+        var executionResult = await _executor.ExecuteAsync(
             plan,
-            ExecuteRestorePipelineAsync,
+            _orchestratorOptions.Value.AllowOverwrite,
             cancellationToken);
+
+        if (!executionResult.Success)
+        {
+            var message = string.IsNullOrWhiteSpace(executionResult.ErrorMessage)
+                ? "Restore execution failed."
+                : executionResult.ErrorMessage;
+
+            _logger.LogError(
+                "Restore execution failed for {DatabaseName}. Steps executed: {StepCount}. Error: {Error}",
+                plan.DatabaseName,
+                executionResult.Steps.Count,
+                message);
+
+            throw new InvalidOperationException("Restore execution failed: " + message);
+        }
+
+        _logger.LogInformation(
+            "Restore orchestration completed successfully for {DatabaseName}. Steps executed: {StepCount}.",
+            plan.DatabaseName,
+            executionResult.Steps.Count);
     }
 
     private string ResolveDatabaseName()
@@ -58,18 +78,5 @@ public sealed class RestoreOrchestratorService : IRestoreOrchestratorService
             throw new InvalidOperationException("RestoreOrchestrator:DatabaseName must be configured for restore orchestration.");
 
         return databaseName;
-    }
-
-    private Task ExecuteRestorePipelineAsync(
-        Domain.ValueObjects.RestorePlan plan,
-        CancellationToken cancellationToken)
-    {
-        _logger.LogInformation(
-            "Restore pipeline reached guarded execution stage for {DatabaseName} at target {TargetTime:yyyy-MM-dd HH:mm:ss}.",
-            plan.DatabaseName,
-            plan.TargetTime);
-
-        // Execution script/steps are implemented in P1-022.
-        throw new NotSupportedException("Restore execution steps are not implemented yet. Complete P1-022 Restore Execution Service.");
     }
 }

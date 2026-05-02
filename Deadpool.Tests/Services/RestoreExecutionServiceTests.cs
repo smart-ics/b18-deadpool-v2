@@ -1,76 +1,54 @@
+using Deadpool.Core.Configuration;
 using Deadpool.Core.Domain.ValueObjects;
 using Deadpool.Core.Interfaces;
 using Deadpool.Core.Services;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Moq;
 
 namespace Deadpool.Tests.Services;
 
 public class RestoreExecutionServiceTests
 {
-    private readonly Mock<IRestorePlanValidatorService> _validatorMock = new();
+    private readonly Mock<IRestoreScriptBuilderService> _scriptBuilderMock = new();
     private readonly RestoreExecutionService _service;
 
     public RestoreExecutionServiceTests()
     {
-        _service = new RestoreExecutionService(_validatorMock.Object, NullLogger<RestoreExecutionService>.Instance);
+        _service = new RestoreExecutionService(
+            _scriptBuilderMock.Object,
+            Options.Create(new RestoreExecutionOptions { ConnectionString = string.Empty }),
+            NullLogger<RestoreExecutionService>.Instance);
     }
 
     [Fact]
-    public async Task ExecuteAsync_ValidationFails_ThrowsAndDoesNotExecuteRestore()
+    public async Task ExecuteAsync_WhenAllowOverwriteIsFalse_Throws()
     {
         var plan = RestorePlan.CreateInvalidPlan("TestDB", DateTime.UtcNow, "Planner failed");
 
-        _validatorMock
-            .Setup(v => v.Validate(plan))
-            .Returns(new RestoreValidationResult
-            {
-            });
-
-        // Force an explicit validation error.
-        var result = new RestoreValidationResult();
-        result.AddError("Missing file");
-        _validatorMock
-            .Setup(v => v.Validate(plan))
-            .Returns(result);
-
-        var executed = false;
-
-        Func<Task> act = async () => await _service.ExecuteAsync(
-            plan,
-            (_, _) =>
-            {
-                executed = true;
-                return Task.CompletedTask;
-            });
+        Func<Task> act = async () => await _service.ExecuteAsync(plan, allowOverwrite: false);
 
         await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*Restore validation failed:*Missing file*");
+            .WithMessage("*explicit overwrite consent*");
 
-        executed.Should().BeFalse();
+        _scriptBuilderMock.Verify(s => s.Build(It.IsAny<RestorePlan>()), Times.Never);
     }
 
     [Fact]
-    public async Task ExecuteAsync_ValidationPasses_ExecutesRestoreDelegate()
+    public async Task ExecuteAsync_WhenConnectionStringMissing_ReturnsFailedResult()
     {
         var plan = RestorePlan.CreateInvalidPlan("TestDB", DateTime.UtcNow, "planner invalid on purpose");
-        var success = new RestoreValidationResult();
+        var script = new RestoreScript(new List<string> { "RESTORE DATABASE [TestDB] FROM DISK = 'C:\\temp\\full.bak' WITH RECOVERY;" });
 
-        _validatorMock
-            .Setup(v => v.Validate(plan))
-            .Returns(success);
+        _scriptBuilderMock
+            .Setup(s => s.Build(plan))
+            .Returns(script);
 
-        var executed = false;
+        var result = await _service.ExecuteAsync(plan, allowOverwrite: true);
 
-        await _service.ExecuteAsync(
-            plan,
-            (_, _) =>
-            {
-                executed = true;
-                return Task.CompletedTask;
-            });
-
-        executed.Should().BeTrue();
+        result.Success.Should().BeFalse();
+        result.ErrorMessage.Should().NotBeNullOrWhiteSpace();
+        result.Steps.Should().BeEmpty();
     }
 }

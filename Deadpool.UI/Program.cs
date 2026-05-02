@@ -88,6 +88,13 @@ static class Program
         services.Configure<RestoreOrchestratorOptions>(options =>
         {
             options.DatabaseName = backupPolicies.FirstOrDefault()?.DatabaseName ?? string.Empty;
+            options.AllowOverwrite = configuration.GetValue<bool>("Restore:StartupCommand:AllowOverwrite");
+        });
+
+        services.Configure<RestoreExecutionOptions>(options =>
+        {
+            options.ConnectionString = configuration.GetConnectionString("ProductionDatabase") ?? string.Empty;
+            options.CommandTimeoutSeconds = configuration.GetValue<int?>("Restore:Execution:CommandTimeoutSeconds") ?? 300;
         });
 
         // Logging (simple debug logging for UI)

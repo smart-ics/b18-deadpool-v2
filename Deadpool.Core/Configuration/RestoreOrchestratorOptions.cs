@@ -6,4 +6,5 @@ namespace Deadpool.Core.Configuration;
 public sealed class RestoreOrchestratorOptions
 {
     public string DatabaseName { get; set; } = string.Empty;
+    public bool AllowOverwrite { get; set; }
 }

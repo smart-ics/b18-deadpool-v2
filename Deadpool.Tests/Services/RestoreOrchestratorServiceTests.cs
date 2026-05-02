@@ -43,7 +43,7 @@ public class RestoreOrchestratorServiceTests
         validation.Errors.Should().NotBeEmpty();
 
         _executorMock.Verify(
-            e => e.ExecuteAsync(It.IsAny<RestorePlan>(), It.IsAny<Func<RestorePlan, CancellationToken, Task>>(), It.IsAny<CancellationToken>()),
+            e => e.ExecuteAsync(It.IsAny<RestorePlan>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -64,9 +64,9 @@ public class RestoreOrchestratorServiceTests
         _executorMock
             .Setup(e => e.ExecuteAsync(
                 plan,
-                It.IsAny<Func<RestorePlan, CancellationToken, Task>>(),
+                It.IsAny<bool>(),
                 It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
+            .ReturnsAsync(new RestoreExecutionResult { Success = true });
 
         var sut = CreateSut();
 
@@ -77,9 +77,35 @@ public class RestoreOrchestratorServiceTests
         _executorMock.Verify(
             e => e.ExecuteAsync(
                 plan,
-                It.IsAny<Func<RestorePlan, CancellationToken, Task>>(),
+                true,
                 It.IsAny<CancellationToken>()),
             Times.Once);
+    }
+
+    [Fact]
+    public async Task ExecuteRestore_WhenExecutorFails_Throws()
+    {
+        var targetTime = DateTime.UtcNow;
+        var plan = BuildValidPlan(targetTime);
+
+        _plannerMock
+            .Setup(p => p.BuildRestorePlanAsync("TestDB", targetTime))
+            .ReturnsAsync(plan);
+
+        _validatorMock
+            .Setup(v => v.Validate(plan))
+            .Returns(new RestoreValidationResult());
+
+        _executorMock
+            .Setup(e => e.ExecuteAsync(plan, true, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new RestoreExecutionResult { Success = false, ErrorMessage = "SQL timeout" });
+
+        var sut = CreateSut();
+
+        Func<Task> act = async () => await sut.ExecuteRestore(targetTime);
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*Restore execution failed*SQL timeout*");
     }
 
     [Fact]
@@ -104,7 +130,8 @@ public class RestoreOrchestratorServiceTests
     {
         var options = new RestoreOrchestratorOptions
         {
-            DatabaseName = "TestDB"
+            DatabaseName = "TestDB",
+            AllowOverwrite = true
         };
 
         return new RestoreOrchestratorService(

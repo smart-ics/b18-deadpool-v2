@@ -46,9 +46,18 @@ var startupPolicies = builder.Configuration
     .Get<List<DatabaseBackupPolicyOptions>>()
     ?? new List<DatabaseBackupPolicyOptions>();
 
+var productionConnectionString = builder.Configuration.GetConnectionString("ProductionDatabase");
+
 builder.Services.Configure<RestoreOrchestratorOptions>(options =>
 {
     options.DatabaseName = startupPolicies.FirstOrDefault()?.DatabaseName ?? string.Empty;
+    options.AllowOverwrite = builder.Configuration.GetValue<bool>("Restore:StartupCommand:AllowOverwrite");
+});
+
+builder.Services.Configure<RestoreExecutionOptions>(options =>
+{
+    options.ConnectionString = productionConnectionString ?? string.Empty;
+    options.CommandTimeoutSeconds = builder.Configuration.GetValue<int?>("Restore:Execution:CommandTimeoutSeconds") ?? 300;
 });
 
 // Execution worker configuration
@@ -81,8 +90,6 @@ if (string.IsNullOrWhiteSpace(sqlitePath))
 {
     throw new InvalidOperationException("DeadpoolDb:Path is required for shared SQLite database.");
 }
-
-var productionConnectionString = builder.Configuration.GetConnectionString("ProductionDatabase");
 
 builder.Services.AddSingleton<IBackupJobRepository>(sp =>
 {

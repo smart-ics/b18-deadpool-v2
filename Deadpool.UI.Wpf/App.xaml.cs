@@ -72,6 +72,16 @@ public partial class App : Application
 		services.Configure<RestoreOrchestratorOptions>(options =>
 		{
 			options.DatabaseName = firstDatabaseName ?? string.Empty;
+			options.AllowOverwrite = bool.TryParse(configuration["Restore:StartupCommand:AllowOverwrite"], out var allowOverwrite)
+				&& allowOverwrite;
+		});
+
+		services.Configure<RestoreExecutionOptions>(options =>
+		{
+			options.ConnectionString = configuration.GetConnectionString("ProductionDatabase") ?? string.Empty;
+			options.CommandTimeoutSeconds = int.TryParse(configuration["Restore:Execution:CommandTimeoutSeconds"], out var timeoutSeconds)
+				? timeoutSeconds
+				: 300;
 		});
 
 		services.AddLogging(builder =>
