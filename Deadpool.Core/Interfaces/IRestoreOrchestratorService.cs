@@ -1,3 +1,5 @@
+using Deadpool.Core.Domain.ValueObjects;
+
 namespace Deadpool.Core.Interfaces;
 
 /// <summary>
@@ -9,4 +11,12 @@ public interface IRestoreOrchestratorService
     /// Executes restore orchestration for the configured target database.
     /// </summary>
     Task ExecuteRestore(DateTime targetTime, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Executes restore orchestration using explicit runtime confirmation context.
+    /// </summary>
+    Task ExecuteRestore(
+        DateTime targetTime,
+        RestoreConfirmationContext confirmationContext,
+        CancellationToken cancellationToken = default);
 }

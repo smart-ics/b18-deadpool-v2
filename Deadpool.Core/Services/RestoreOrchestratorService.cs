@@ -37,6 +37,22 @@ public sealed class RestoreOrchestratorService : IRestoreOrchestratorService
 
     public async Task ExecuteRestore(DateTime targetTime, CancellationToken cancellationToken = default)
     {
+        var confirmation = new RestoreConfirmationContext
+        {
+            DatabaseName = _orchestratorOptions.Value.DatabaseName,
+            Confirmed = _orchestratorOptions.Value.Confirmed,
+            ConfirmationText = _orchestratorOptions.Value.ConfirmationText,
+            RequireTextMatch = _orchestratorOptions.Value.RequireTextMatch
+        };
+
+        await ExecuteRestore(targetTime, confirmation, cancellationToken);
+    }
+
+    public async Task ExecuteRestore(
+        DateTime targetTime,
+        RestoreConfirmationContext confirmationContext,
+        CancellationToken cancellationToken = default)
+    {
         var databaseName = ResolveDatabaseName();
 
         var plan = await _planner.BuildRestorePlanAsync(databaseName, targetTime);
@@ -49,15 +65,15 @@ public sealed class RestoreOrchestratorService : IRestoreOrchestratorService
             throw new InvalidOperationException(message);
         }
 
-        var confirmation = new RestoreConfirmationContext
+        var effectiveConfirmation = new RestoreConfirmationContext
         {
             DatabaseName = plan.DatabaseName,
-            Confirmed = _orchestratorOptions.Value.Confirmed,
-            ConfirmationText = _orchestratorOptions.Value.ConfirmationText,
-            RequireTextMatch = _orchestratorOptions.Value.RequireTextMatch
+            Confirmed = confirmationContext.Confirmed,
+            ConfirmationText = confirmationContext.ConfirmationText,
+            RequireTextMatch = confirmationContext.RequireTextMatch
         };
 
-        _safetyGuard.EnsureConfirmed(confirmation);
+        _safetyGuard.EnsureConfirmed(effectiveConfirmation);
 
         var executionResult = await _executor.ExecuteAsync(
             plan,

@@ -2,6 +2,7 @@ using Deadpool.Core.Interfaces;
 using Deadpool.Core.Services;
 using Deadpool.Core.Configuration;
 using Deadpool.Infrastructure.Persistence;
+using Deadpool.UI.Wpf.Views;
 using Deadpool.UI.Wpf.ViewModels;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -133,7 +134,12 @@ public partial class App : Application
 		services.AddScoped<IRestoreSafetyGuard, RestoreSafetyGuardService>();
 		services.AddScoped<IRestoreExecutionService, RestoreExecutionService>();
 		services.AddScoped<IRestoreOrchestratorService, RestoreOrchestratorService>();
-		services.AddSingleton<MainWindow>();
+		services.AddTransient<RestoreViewModel>();
+		services.AddTransient<RestoreWindow>();
+		services.AddSingleton<MainWindow>(sp =>
+			new MainWindow(
+				sp.GetRequiredService<DashboardViewModel>(),
+				sp));
 
 		services.AddSingleton<DashboardViewModel>(sp =>
 		{
