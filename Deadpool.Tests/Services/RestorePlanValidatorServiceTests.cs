@@ -197,6 +197,42 @@ public class RestorePlanValidatorServiceTests
     }
 
     [Fact]
+    public void Validate_BaseWithoutLastLsn_WithConsecutiveLogs_ReturnsValid()
+    {
+        var tempDir = CreateTempDirectory();
+        try
+        {
+            var fullPath = CreateTempFile(tempDir, "full.bak");
+            var log1Path = CreateTempFile(tempDir, "log1.trn");
+            var log2Path = CreateTempFile(tempDir, "log2.trn");
+
+            var full = CreateCompletedFullBackup(fullPath, DateTime.UtcNow.AddHours(-5));
+            full.SetLSNMetadata(full.FirstLSN, null, full.DatabaseBackupLSN, full.CheckpointLSN);
+
+            var log1 = CreateCompletedLogBackup(log1Path, full.EndTime!.Value.AddMinutes(5), 5000m);
+            var log2 = CreateCompletedLogBackup(log2Path, log1.EndTime!.Value.AddMinutes(5), log1.LastLSN!.Value);
+
+            var target = log2.StartTime.AddMinutes(5);
+            var plan = RestorePlan.CreateValidPlan(
+                "TestDB",
+                target,
+                full,
+                differentialBackup: null,
+                logBackups: new List<BackupJob> { log1, log2 },
+                actualRestorePoint: target);
+
+            var result = _service.Validate(plan);
+
+            result.IsValid.Should().BeTrue();
+            result.Errors.Should().BeEmpty();
+        }
+        finally
+        {
+            Directory.Delete(tempDir, recursive: true);
+        }
+    }
+
+    [Fact]
     public void Validate_FullOnlyRestore_ReturnsValid()
     {
         var tempDir = CreateTempDirectory();

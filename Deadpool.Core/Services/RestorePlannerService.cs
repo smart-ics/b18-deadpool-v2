@@ -88,7 +88,16 @@ public sealed class RestorePlannerService : IRestorePlannerService
         BackupJob baseBackup,
         DateTime targetTime)
     {
-        var baseEndTime = baseBackup.EndTime!.Value;
+        var baseEndTime = baseBackup.EndTime ?? DateTime.MinValue;
+
+        if (baseBackup.EndTime == null)
+        {
+            return (
+                false,
+                "Base backup missing EndTime.",
+                new List<BackupJob>(),
+                baseEndTime);
+        }
 
         if (targetTime <= baseEndTime)
         {
@@ -97,7 +106,7 @@ public sealed class RestorePlannerService : IRestorePlannerService
 
         var candidateLogs = completedBackups
             .Where(b => b.BackupType == BackupType.TransactionLog)
-            .Where(b => b.StartTime >= baseEndTime)
+            .Where(b => b.EndTime.HasValue && b.EndTime.Value > baseEndTime)
             .OrderBy(b => b.StartTime)
             .ToList();
 
@@ -110,40 +119,34 @@ public sealed class RestorePlannerService : IRestorePlannerService
                 baseEndTime);
         }
 
-        if (!baseBackup.LastLSN.HasValue)
-        {
-            return (
-                false,
-                "Selected base backup is missing LastLSN, so log chain continuity cannot be validated.",
-                new List<BackupJob>(),
-                baseEndTime);
-        }
-
         var selectedLogs = new List<BackupJob>();
-        var expectedFirstLsn = baseBackup.LastLSN.Value;
+        BackupJob? previousLog = null;
 
         foreach (var log in candidateLogs)
         {
-            if (!log.FirstLSN.HasValue || !log.LastLSN.HasValue)
+            if (previousLog != null)
             {
-                return (
-                    false,
-                    $"Log backup is missing LSN metadata: {log.BackupFilePath}",
-                    new List<BackupJob>(),
-                    baseEndTime);
-            }
+                if (!previousLog.LastLSN.HasValue || !log.FirstLSN.HasValue)
+                {
+                    return (
+                        false,
+                        $"Log chain is missing LSN metadata between consecutive logs: {previousLog.BackupFilePath} -> {log.BackupFilePath}.",
+                        new List<BackupJob>(),
+                        baseEndTime);
+                }
 
-            if (log.FirstLSN.Value > expectedFirstLsn)
-            {
-                return (
-                    false,
-                    $"Broken transaction log chain detected. Expected FirstLSN <= {expectedFirstLsn}, found {log.FirstLSN.Value}.",
-                    new List<BackupJob>(),
-                    baseEndTime);
+                if (previousLog.LastLSN.Value != log.FirstLSN.Value)
+                {
+                    return (
+                        false,
+                        $"Broken transaction log chain detected. Expected FirstLSN == {previousLog.LastLSN.Value}, found {log.FirstLSN.Value}.",
+                        new List<BackupJob>(),
+                        baseEndTime);
+                }
             }
 
             selectedLogs.Add(log);
-            expectedFirstLsn = log.LastLSN.Value;
+            previousLog = log;
 
             if (log.EndTime!.Value >= targetTime)
             {

@@ -117,6 +117,29 @@ public class RestorePlannerServiceTests
     }
 
     [Fact]
+    public async Task BuildRestorePlanAsync_BaseWithoutLastLsn_SelectsLogsByEndTime()
+    {
+        var full = CreateCompletedFullBackup("Full.bak", DateTime.UtcNow.AddHours(-8), TimeSpan.FromMinutes(20));
+        full.SetLSNMetadata(full.FirstLSN, null, full.DatabaseBackupLSN, full.CheckpointLSN);
+
+        var overlappingLog = CreateCompletedLogBackup(
+            "LogOverlap.trn",
+            full.EndTime!.Value.AddMinutes(-10),
+            TimeSpan.FromMinutes(15),
+            9000m);
+
+        _repository.Setup(r => r.GetBackupsByDatabaseAsync("TestDB"))
+            .ReturnsAsync(new List<BackupJob> { full, overlappingLog });
+
+        var targetTime = full.EndTime.Value.AddMinutes(2);
+        var plan = await _service.BuildRestorePlanAsync("TestDB", targetTime);
+
+        plan.IsValid.Should().BeTrue();
+        plan.LogBackups.Should().ContainSingle();
+        plan.LogBackups[0].Should().Be(overlappingLog);
+    }
+
+    [Fact]
     public async Task BuildRestorePlanAsync_TargetBeyondLogCoverage_ReturnsInvalidPlan()
     {
         var full = CreateCompletedFullBackup("Full.bak", DateTime.UtcNow.AddHours(-8), TimeSpan.FromMinutes(20));

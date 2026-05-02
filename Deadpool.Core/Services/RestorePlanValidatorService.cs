@@ -163,16 +163,16 @@ public sealed class RestorePlanValidatorService : IRestorePlanValidatorService
             return;
 
         var baseBackup = plan.DifferentialBackup ?? plan.FullBackup!;
-        if (!baseBackup.LastLSN.HasValue)
+        if (!baseBackup.EndTime.HasValue)
         {
-            var message = "Selected base backup is missing LastLSN, so log chain continuity cannot be validated.";
+            var message = "Base backup missing EndTime.";
             result.AddError(message);
             _logger.LogError("Chain inconsistency: {Message}", message);
             return;
         }
 
-        var expectedFirstLsn = baseBackup.LastLSN.Value;
         DateTime? previousEndTime = baseBackup.EndTime;
+        BackupJob? previousLog = null;
 
         foreach (var log in logs)
         {
@@ -199,23 +199,30 @@ public sealed class RestorePlanValidatorService : IRestorePlanValidatorService
                 _logger.LogError("Chain inconsistency: {Message}", message);
             }
 
-            if (!log.FirstLSN.HasValue || !log.LastLSN.HasValue)
+            if (previousLog != null)
             {
-                var message = $"Log backup missing LSN metadata: {GetDisplayPath(log)}.";
-                result.AddError(message);
-                _logger.LogError("Chain inconsistency: {Message}", message);
-                continue;
+                if (!previousLog.LastLSN.HasValue || !log.FirstLSN.HasValue)
+                {
+                    var message =
+                        $"Log chain is missing LSN metadata between consecutive logs: {GetDisplayPath(previousLog)} -> {GetDisplayPath(log)}.";
+                    result.AddError(message);
+                    _logger.LogError("Chain inconsistency: {Message}", message);
+                    previousEndTime = log.EndTime;
+                    previousLog = log;
+                    continue;
+                }
+
+                if (previousLog.LastLSN.Value != log.FirstLSN.Value)
+                {
+                    var message =
+                        $"Broken transaction log chain detected. Expected FirstLSN == {previousLog.LastLSN.Value}, found {log.FirstLSN.Value}.";
+                    result.AddError(message);
+                    _logger.LogError("Chain inconsistency: {Message}", message);
+                }
             }
 
-            if (log.FirstLSN.Value > expectedFirstLsn)
-            {
-                var message = $"Broken transaction log chain detected. Expected FirstLSN <= {expectedFirstLsn}, found {log.FirstLSN.Value}.";
-                result.AddError(message);
-                _logger.LogError("Chain inconsistency: {Message}", message);
-            }
-
-            expectedFirstLsn = log.LastLSN.Value;
             previousEndTime = log.EndTime;
+            previousLog = log;
         }
     }
 

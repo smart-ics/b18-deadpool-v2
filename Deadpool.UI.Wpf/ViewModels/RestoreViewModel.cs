@@ -63,7 +63,7 @@ public sealed class RestoreViewModel : INotifyPropertyChanged
         _targetDate = now.Date;
         _selectedHour = now.Hour;
         _selectedMinute = now.Minute;
-        _targetTime = new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, 0, DateTimeKind.Local);
+        _targetTime = new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, 59, DateTimeKind.Local);
 
         Hours = new ObservableCollection<int>(Enumerable.Range(0, 24));
         Minutes = new ObservableCollection<int>(Enumerable.Range(0, 60));
