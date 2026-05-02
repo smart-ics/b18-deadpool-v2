@@ -195,7 +195,7 @@ Detect problems early.
 
 ### P1-008 Implement Backup Health Monitoring
 
-Status: Todo
+Status: Done
 
 Implement:
 
@@ -209,7 +209,7 @@ Requires DBA review.
 
 ### P1-009 Implement Storage Monitoring
 
-Status: Todo
+Status: Done
 
 Monitor:
 
@@ -228,7 +228,7 @@ Automate cleanup safely.
 
 ### P1-010 Implement Retention Cleanup
 
-Status: Todo
+Status: Done
 
 Implement:
 
@@ -254,7 +254,7 @@ Minimal operational UI.
 
 ### P2-011 Build Monitoring Dashboard
 
-Status: Todo
+Status: Done
 
 Show:
 
@@ -266,7 +266,7 @@ Show:
 
 ### P2-012 Build Backup Job Monitor
 
-Status: Todo
+Status: Done
 
 Grid:
 
@@ -286,7 +286,7 @@ Prepare one-click restore foundation.
 
 ### P1-013 Model Backup Chain Resolution
 
-Status: Todo
+Status: Done
 
 Given restore point:
 
@@ -312,7 +312,7 @@ Improve operational safety and operator visibility for production deployment rea
 
 ### P1-014 Bootstrap Initial Full Backup
 
-Status: Todo
+Status: Done
 
 Implement startup behavior:
 
@@ -335,7 +335,7 @@ High priority safety enhancement.
 
 ### P2-015 Display Backup Policy in Plain English
 
-Status: Todo
+Status: Done
 
 Enhance UI dashboard to display configured backup policy in operator-friendly language.
 
@@ -360,7 +360,7 @@ Focus:
 
 ### P2-016 Show Database and Backup Topology Status
 
-Status: Todo
+Status: Done
 
 Display configuration and topology information in UI:
 
@@ -379,7 +379,7 @@ Operator can verify what is being protected.
 
 ### P1-017 Production Database Pulse Monitoring
 
-Status: Todo
+Status: Done
 
 Implement monitoring for production database availability.
 
@@ -407,7 +407,7 @@ Requires:
 
 ### P2-018 Show Backup Chain Initialization Status
 
-Status: Todo
+Status: Done
 
 Display in dashboard:
 
@@ -420,7 +420,182 @@ Warn clearly if system not yet protected.
 Depends on:
 - P1-014
 
+## EPIC-9 Restore Execution (Phase-2)
 
+Goal:
+
+Enable safe, verifiable, and operator-controlled database restore from backups.
+
+Focus:
+
+Restore correctness
+Operator safety
+Clear restore visibility
+Controlled execution (no accidental data loss)
+
+### P1-019 Restore Plan Validation
+
+Status: Todo
+
+Validate restore plan before execution.
+
+Implement:
+
+Verify all backup files exist on storage
+Verify file accessibility (permissions, locks)
+Re-validate backup chain integrity (defensive check)
+Ensure STOPAT is covered by available backups
+
+Output:
+
+RestoreValidationResult
+IsValid
+Errors
+Warnings
+
+Rules:
+
+Restore must NOT proceed if validation fails
+Validation must be deterministic and reproducible
+
+Requires:
+
+DBA review mandatory
+
+### P1-020 Restore Script Builder
+
+Status: Todo
+
+Generate SQL Server restore script from RestorePlan.
+
+Implement:
+
+FULL restore WITH NORECOVERY
+DIFF restore WITH NORECOVERY (if exists)
+LOG chain restore WITH NORECOVERY
+Final LOG restore WITH STOPAT + RECOVERY
+
+Ensure:
+
+Correct ordering
+Correct STOPAT placement
+No missing steps
+
+Output:
+
+RestoreScript (string or structured steps)
+
+Requires:
+
+DBA review mandatory
+
+### P1-021 Restore Execution Service
+
+Status: Todo
+
+Execute restore script safely.
+
+Implement:
+
+Execute restore commands sequentially via SQL connection
+Capture execution result per step
+Log all execution steps
+
+Output:
+
+RestoreExecutionResult
+Success / Failure
+Step logs
+Error message (if any)
+
+Constraints:
+
+Must NOT silently overwrite database
+Must fail clearly on any step error
+
+### P1-022 Restore Safety Guard
+
+Status: Todo
+
+Prevent accidental destructive restore operations.
+
+Implement:
+
+Explicit confirmation required before execution
+Display target database name clearly
+Display overwrite warning
+Optional: require operator to type database name to confirm
+
+Goal:
+
+Ensure operator intentionally performs restore
+
+P2-023 Restore Dialog UI
+
+Status: Todo
+
+Implement dedicated Restore interface.
+
+Design:
+
+Separate window (modal), NOT part of dashboard
+
+Features:
+
+Select restore point (DateTime)
+Generate restore plan
+Display restore plan
+Show validation result
+Execute restore (after confirmation)
+
+Flow:
+
+Select → Plan → Validate → Confirm → Execute
+P2-024 Restore Plan Visualization
+
+Status: Todo
+
+Display restore plan in operator-friendly format.
+
+Show:
+
+Full backup used
+Differential backup (if any)
+Ordered log chain
+STOPAT position
+
+Format:
+
+Sequential flow (FULL → DIFF → LOG → STOPAT)
+
+Goal:
+
+Operator can understand restore sequence in seconds
+
+### P2-025 Restore Execution Result & History
+
+Status: Todo
+
+Record and display restore activity.
+
+Store:
+
+Restore timestamp
+Target restore time
+Backups used
+Execution result
+Duration
+
+Display:
+
+Recent restore history
+Success / failure status
+
+Goal:
+
+Provide audit trail and operator confidence
+
+<!-- 
 ## Technical Debt Queue
 
 Future improvements:
@@ -454,4 +629,4 @@ Recommended order:
 4 P0-006 Worker pipeline  
 5 P1-007 Backup file copy
 
-Start here.
+Start here. -->
