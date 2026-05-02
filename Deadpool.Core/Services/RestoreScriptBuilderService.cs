@@ -60,8 +60,21 @@ public sealed class RestoreScriptBuilderService : IRestoreScriptBuilderService
 
     private static string BuildFinalRestoreLogWithStopAt(string escapedDatabaseName, string path, DateTime stopAt)
     {
-        var stopAtIso = stopAt.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture);
-        return $"RESTORE LOG [{escapedDatabaseName}] FROM DISK = '{EscapeStringLiteral(path)}' WITH STOPAT = '{stopAtIso}', RECOVERY;";
+        var stopAtLiteral = FormatStopAtLiteral(stopAt);
+        return $"RESTORE LOG [{escapedDatabaseName}] FROM DISK = '{EscapeStringLiteral(path)}' WITH STOPAT = '{stopAtLiteral}', RECOVERY;";
+    }
+
+    private static string FormatStopAtLiteral(DateTime stopAt)
+    {
+        // Preserve sub-second precision and include explicit offset context for deterministic point-in-time restore.
+        var normalized = stopAt.Kind switch
+        {
+            DateTimeKind.Utc => new DateTimeOffset(stopAt, TimeSpan.Zero),
+            DateTimeKind.Local => new DateTimeOffset(stopAt),
+            _ => new DateTimeOffset(DateTime.SpecifyKind(stopAt, DateTimeKind.Utc), TimeSpan.Zero)
+        };
+
+        return normalized.ToString("yyyy-MM-ddTHH:mm:ss.fffffffK", CultureInfo.InvariantCulture);
     }
 
     private static string EscapeIdentifier(string value)
