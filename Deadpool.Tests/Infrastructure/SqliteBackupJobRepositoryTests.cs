@@ -45,6 +45,30 @@ public class SqliteBackupJobRepositoryTests : IDisposable
         hasFull.Should().BeTrue();
     }
 
+    [Fact]
+    public async Task UpdateAsync_ShouldPersistNewBackupFilePath_WhenJobCompletes()
+    {
+        var repository = new SqliteBackupJobRepository(_databasePath, NullLogger<SqliteBackupJobRepository>.Instance);
+        var job = new BackupJob("HospitalDB", BackupType.Differential, "PENDING_HospitalDB_DIFF_20260502_0025.bak");
+
+        await repository.CreateAsync(job);
+
+        var claimed = await repository.TryClaimJobAsync(job);
+        claimed.Should().BeTrue();
+
+        job.MarkAsRunning();
+        var actualPath = @"C:\Backups\HospitalDB_DIFF_20260502_0025.bak";
+        job.MarkAsCompleted(actualPath, 1024);
+
+        await repository.UpdateAsync(job);
+
+        var backups = await repository.GetBackupsByDatabaseAsync("HospitalDB");
+        var persisted = backups.Single();
+
+        persisted.Status.Should().Be(BackupStatus.Completed);
+        persisted.BackupFilePath.Should().Be(actualPath);
+    }
+
     private static BackupJob CreateCompletedFullBackup(string databaseName, string filePath, long fileSizeBytes)
     {
         var job = new BackupJob(databaseName, BackupType.Full, filePath);
@@ -57,7 +81,22 @@ public class SqliteBackupJobRepositoryTests : IDisposable
     {
         if (File.Exists(_databasePath))
         {
-            File.Delete(_databasePath);
+            for (var attempt = 0; attempt < 5; attempt++)
+            {
+                try
+                {
+                    File.Delete(_databasePath);
+                    break;
+                }
+                catch (IOException) when (attempt < 4)
+                {
+                    Thread.Sleep(50);
+                }
+                catch (IOException)
+                {
+                    break;
+                }
+            }
         }
     }
 }

@@ -9,7 +9,7 @@ public class BackupJob
     public BackupStatus Status { get; private set; }
     public DateTime StartTime { get; }
     public DateTime? EndTime { get; private set; }
-    public string BackupFilePath { get; }
+    public string BackupFilePath { get; private set; }
     public long? FileSizeBytes { get; private set; }
     public string? ErrorMessage { get; private set; }
 
@@ -111,12 +111,21 @@ public class BackupJob
 
     public void MarkAsCompleted(long fileSizeBytes)
     {
+        MarkAsCompleted(BackupFilePath, fileSizeBytes);
+    }
+
+    public void MarkAsCompleted(string backupFilePath, long fileSizeBytes)
+    {
         if (Status != BackupStatus.Running)
             throw new InvalidOperationException($"Cannot mark job as completed. Current status: {Status}");
+
+        if (string.IsNullOrWhiteSpace(backupFilePath))
+            throw new ArgumentException("Backup file path cannot be empty.", nameof(backupFilePath));
 
         if (fileSizeBytes <= 0)
             throw new ArgumentException("File size must be greater than zero.", nameof(fileSizeBytes));
 
+        BackupFilePath = backupFilePath;
         Status = BackupStatus.Completed;
         EndTime = DateTime.UtcNow;
         FileSizeBytes = fileSizeBytes;

@@ -73,13 +73,15 @@ public sealed class BackupExecutionWorker : BackgroundService
     {
         try
         {
+            var jobId = BuildJobId(job);
+
             // Attempt to claim the job (transition Pending → Running)
             var claimed = await _jobRepository.TryClaimJobAsync(job);
             if (!claimed)
             {
                 _logger.LogDebug(
-                    "Job already claimed by another worker: {Database} {Type}",
-                    job.DatabaseName, job.BackupType);
+                    "Job already claimed by another worker: {Database} {Type} ({JobId})",
+                    job.DatabaseName, job.BackupType, jobId);
                 return;
             }
 
@@ -91,35 +93,43 @@ public sealed class BackupExecutionWorker : BackgroundService
             else if (job.Status != BackupStatus.Running)
             {
                 _logger.LogWarning(
-                    "Skipping execution for {Database} {Type}. Invalid job status: {Status}",
+                    "Skipping execution for {Database} {Type}. Invalid job status: {Status} ({JobId})",
                     job.DatabaseName,
                     job.BackupType,
-                    job.Status);
+                    job.Status,
+                    jobId);
                 return;
             }
 
             _logger.LogInformation(
-                "Executing {Type} backup for {Database}",
-                job.BackupType, job.DatabaseName);
+                "Executing {Type} backup -> {JobId}",
+                job.BackupType, jobId);
 
             // Generate proper file path (replace scheduler's placeholder)
-            var backupFilePath = _filePathService.GenerateBackupFilePath(job.DatabaseName, job.BackupType);
+            var actualBackupFilePath = _filePathService.GenerateBackupFilePath(job.DatabaseName, job.BackupType);
+            ValidateRealBackupFilePath(actualBackupFilePath);
 
             // Validate prerequisites
             await ValidatePrerequisitesAsync(job.DatabaseName, job.BackupType);
 
             // Execute backup directly
-            await ExecuteBackupAsync(job.DatabaseName, job.BackupType, backupFilePath);
+            await ExecuteBackupAsync(job.DatabaseName, job.BackupType, actualBackupFilePath);
+
+            _logger.LogInformation("Backup file created: {Path}", actualBackupFilePath);
 
             // Verify backup before marking completion
-            var isVerified = await _backupExecutor.VerifyBackupFileAsync(backupFilePath);
+            var isVerified = await _backupExecutor.VerifyBackupFileAsync(actualBackupFilePath);
             if (!isVerified)
                 throw new InvalidOperationException(
                     $"Backup verification failed for database '{job.DatabaseName}' ({job.BackupType}).");
 
             // Get file size and mark completed
-            var fileSize = GetBackupFileSize(backupFilePath);
-            job.MarkAsCompleted(fileSize);
+            EnsureReadyToComplete(job, actualBackupFilePath);
+
+            _logger.LogInformation("Marking job completed with path: {Path}", actualBackupFilePath);
+
+            var fileSize = GetBackupFileSize(actualBackupFilePath);
+            job.MarkAsCompleted(actualBackupFilePath, fileSize);
             await _jobRepository.UpdateAsync(job);
 
             _logger.LogInformation(
@@ -200,5 +210,31 @@ public sealed class BackupExecutionWorker : BackgroundService
             throw new FileNotFoundException($"Backup file not found: {backupFilePath}");
 
         return new FileInfo(backupFilePath).Length;
+    }
+
+    private static void EnsureReadyToComplete(BackupJob job, string backupFilePath)
+    {
+        if (job.Status != BackupStatus.Running)
+            throw new InvalidOperationException(
+                $"Cannot complete backup job for '{job.DatabaseName}' ({job.BackupType}) while status is {job.Status}.");
+
+        ValidateRealBackupFilePath(backupFilePath);
+    }
+
+    private static void ValidateRealBackupFilePath(string backupFilePath)
+    {
+        if (string.IsNullOrWhiteSpace(backupFilePath))
+            throw new ArgumentException("Backup file path cannot be empty.", nameof(backupFilePath));
+
+        if (Path.GetFileName(backupFilePath).StartsWith("PENDING_", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException($"Backup file path is still pending placeholder: {backupFilePath}");
+
+        if (!Path.IsPathRooted(backupFilePath))
+            throw new InvalidOperationException($"Backup file path must be an absolute path: {backupFilePath}");
+    }
+
+    private static string BuildJobId(BackupJob job)
+    {
+        return $"{job.DatabaseName}:{job.BackupType}:{job.StartTime:O}";
     }
 }

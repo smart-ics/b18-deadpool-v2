@@ -102,26 +102,32 @@ public class SqliteBackupJobRepository : IBackupJobRepository
             UPDATE BackupJobs SET
                 Status = @Status,
                 EndTime = @EndTime,
+                BackupFilePath = @BackupFilePath,
                 FileSizeBytes = @FileSizeBytes,
                 ErrorMessage = @ErrorMessage,
                 FirstLSN = @FirstLSN,
                 LastLSN = @LastLSN,
                 DatabaseBackupLSN = @DatabaseBackupLSN,
                 CheckpointLSN = @CheckpointLSN
-            WHERE BackupFilePath = @BackupFilePath;
+            WHERE DatabaseName = @DatabaseName
+              AND BackupType = @BackupType
+              AND StartTime = @StartTime;
         ";
 
         await connection.ExecuteAsync(sql, new
         {
+            backupJob.DatabaseName,
+            BackupType = (int)backupJob.BackupType,
+            StartTime = backupJob.StartTime.ToString("O"),
             Status = (int)backupJob.Status,
             EndTime = backupJob.EndTime?.ToString("O"),
+            backupJob.BackupFilePath,
             backupJob.FileSizeBytes,
             backupJob.ErrorMessage,
             backupJob.FirstLSN,
             backupJob.LastLSN,
             backupJob.DatabaseBackupLSN,
-            backupJob.CheckpointLSN,
-            backupJob.BackupFilePath
+            backupJob.CheckpointLSN
         });
     }
 
@@ -192,15 +198,19 @@ public class SqliteBackupJobRepository : IBackupJobRepository
         var sql = @"
             UPDATE BackupJobs 
             SET Status = @NewStatus 
-            WHERE BackupFilePath = @BackupFilePath 
+            WHERE DatabaseName = @DatabaseName
+            AND BackupType = @BackupType
+            AND StartTime = @StartTime
             AND Status = @OldStatus;
         ";
 
         var rowsAffected = await connection.ExecuteAsync(sql, new
         {
+            job.DatabaseName,
+            BackupType = (int)job.BackupType,
+            StartTime = job.StartTime.ToString("O"),
             NewStatus = (int)BackupStatus.Running,
-            OldStatus = (int)BackupStatus.Pending,
-            job.BackupFilePath
+            OldStatus = (int)BackupStatus.Pending
         });
 
         return rowsAffected > 0;

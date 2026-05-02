@@ -12,7 +12,7 @@ namespace Deadpool.Tests.Unit;
 public class BackupExecutionWorkerTests
 {
     [Fact]
-    public async Task Executor_ShouldTransitionLifecycleCorrectly_ForBootstrapFullThenDifferential()
+    public async Task Executor_ShouldTransitionLifecycleAndAssignRealFilePath_ForAllBackupTypes()
     {
         // Arrange
         var tempRoot = Path.Combine(Path.GetTempPath(), $"deadpool-worker-tests-{Guid.NewGuid():N}");
@@ -34,9 +34,11 @@ public class BackupExecutionWorkerTests
 
             var fullJob = new BackupJob("TestDB", BackupType.Full, Path.Combine(tempRoot, "full-placeholder.bak"));
             var diffJob = new BackupJob("TestDB", BackupType.Differential, Path.Combine(tempRoot, "diff-placeholder.bak"));
+            var logJob = new BackupJob("TestDB", BackupType.TransactionLog, Path.Combine(tempRoot, "log-placeholder.trn"));
 
             await repository.CreateAsync(fullJob);
             await repository.CreateAsync(diffJob);
+            await repository.CreateAsync(logJob);
 
             // Act
             var cts = new CancellationTokenSource();
@@ -48,11 +50,27 @@ public class BackupExecutionWorkerTests
             // Assert
             fullJob.Status.Should().Be(BackupStatus.Completed);
             diffJob.Status.Should().Be(BackupStatus.Completed);
+            logJob.Status.Should().Be(BackupStatus.Completed);
+
+            fullJob.BackupFilePath.Should().NotStartWith("PENDING_");
+            diffJob.BackupFilePath.Should().NotStartWith("PENDING_");
+            logJob.BackupFilePath.Should().NotStartWith("PENDING_");
+
+            Path.IsPathRooted(fullJob.BackupFilePath).Should().BeTrue();
+            Path.IsPathRooted(diffJob.BackupFilePath).Should().BeTrue();
+            Path.IsPathRooted(logJob.BackupFilePath).Should().BeTrue();
+
+            File.Exists(fullJob.BackupFilePath).Should().BeTrue();
+            File.Exists(diffJob.BackupFilePath).Should().BeTrue();
+            File.Exists(logJob.BackupFilePath).Should().BeTrue();
 
             repository.GetStatusHistory(fullJob)
                 .Should().ContainInOrder(BackupStatus.Running, BackupStatus.Completed);
 
             repository.GetStatusHistory(diffJob)
+                .Should().ContainInOrder(BackupStatus.Running, BackupStatus.Completed);
+
+            repository.GetStatusHistory(logJob)
                 .Should().ContainInOrder(BackupStatus.Running, BackupStatus.Completed);
         }
         finally
