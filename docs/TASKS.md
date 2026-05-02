@@ -418,6 +418,7 @@ Display in dashboard:
 Warn clearly if system not yet protected.
 
 Depends on:
+
 - P1-014
 
 ## EPIC-9 Restore Execution (Phase-2)
@@ -433,7 +434,28 @@ Operator safety
 Clear restore visibility
 Controlled execution (no accidental data loss)
 
-### P1-019 Restore Plan Validation
+### P1-019 Restore Plan Builder
+
+GOAL
+Given a target DateTime (STOPAT), determine:
+
+Required FULL backup
+Optional DIFFERENTIAL backup
+Required LOG backup chain
+Return a RestorePlan object.
+
+INPUT
+DateTime targetTime
+
+OUTPUT
+RestorePlan:
+
+FullBackup
+DifferentialBackup (optional)
+LogBackups (ordered)
+TargetTime
+
+### P1-020 Restore Plan Validation
 
 Status: Todo
 
@@ -462,7 +484,7 @@ Requires:
 
 DBA review mandatory
 
-### P1-020 Restore Script Builder
+### P1-021 Restore Script Builder
 
 Status: Todo
 
@@ -489,7 +511,7 @@ Requires:
 
 DBA review mandatory
 
-### P1-021 Restore Execution Service
+### P1-022 Restore Execution Service
 
 Status: Todo
 
@@ -513,7 +535,7 @@ Constraints:
 Must NOT silently overwrite database
 Must fail clearly on any step error
 
-### P1-022 Restore Safety Guard
+### P1-023 Restore Safety Guard
 
 Status: Todo
 
@@ -530,7 +552,7 @@ Goal:
 
 Ensure operator intentionally performs restore
 
-P2-023 Restore Dialog UI
+### P2-024 Restore Dialog UI
 
 Status: Todo
 
@@ -551,7 +573,8 @@ Execute restore (after confirmation)
 Flow:
 
 Select → Plan → Validate → Confirm → Execute
-P2-024 Restore Plan Visualization
+
+### P2-025 Restore Plan Visualization
 
 Status: Todo
 
@@ -572,7 +595,7 @@ Goal:
 
 Operator can understand restore sequence in seconds
 
-### P2-025 Restore Execution Result & History
+### P2-026 Restore Execution Result & History
 
 Status: Todo
 
