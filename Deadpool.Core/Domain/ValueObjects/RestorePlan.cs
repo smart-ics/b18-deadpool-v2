@@ -16,6 +16,7 @@ public sealed class RestorePlan
     public IReadOnlyList<BackupJob> LogBackups { get; }
 
     public DateTime RequestedRestorePoint { get; }
+    public DateTime TargetTime => RequestedRestorePoint;
     public DateTime? ActualRestorePoint { get; }
 
     public string DatabaseName { get; }
