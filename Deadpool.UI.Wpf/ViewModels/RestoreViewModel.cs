@@ -293,21 +293,21 @@ public sealed class RestoreViewModel : INotifyPropertyChanged
         if (plan.FullBackup != null)
         {
             var fullIsStopAt = !hasLogs && plan.DifferentialBackup == null;
-            steps.Add(ToStep(plan.FullBackup, isStopAt: fullIsStopAt));
+            steps.Add(ToStep(plan.FullBackup, isStopAt: fullIsStopAt, order: steps.Count + 1));
             stopAtAssigned = fullIsStopAt;
         }
 
         if (plan.DifferentialBackup != null)
         {
             var diffIsStopAt = !hasLogs;
-            steps.Add(ToStep(plan.DifferentialBackup, isStopAt: diffIsStopAt));
+            steps.Add(ToStep(plan.DifferentialBackup, isStopAt: diffIsStopAt, order: steps.Count + 1));
             stopAtAssigned = stopAtAssigned || diffIsStopAt;
         }
 
         for (var i = 0; i < plan.LogBackups.Count; i++)
         {
             var isLast = i == plan.LogBackups.Count - 1;
-            steps.Add(ToStep(plan.LogBackups[i], isStopAt: isLast));
+            steps.Add(ToStep(plan.LogBackups[i], isStopAt: isLast, order: steps.Count + 1));
             if (isLast)
             {
                 stopAtAssigned = true;
@@ -318,25 +318,46 @@ public sealed class RestoreViewModel : INotifyPropertyChanged
         if (!stopAtAssigned && steps.Count > 0)
         {
             var last = steps[^1];
-            steps[^1] = new RestoreStepViewModel(last.Type, last.FileName, last.CompletedAt, isStopAt: true);
+            steps[^1] = new RestoreStepViewModel(
+                stepType: last.StepType,
+                displayName: last.DisplayName,
+                isStopAt: true,
+                order: last.Order,
+                isLast: true);
+        }
+
+        for (var i = 0; i < steps.Count; i++)
+        {
+            var isLast = i == steps.Count - 1;
+            if (steps[i].IsLast != isLast)
+            {
+                var s = steps[i];
+                steps[i] = new RestoreStepViewModel(
+                    stepType: s.StepType,
+                    displayName: s.DisplayName,
+                    isStopAt: s.IsStopAt,
+                    order: s.Order,
+                    isLast: isLast);
+            }
         }
 
         return new RestorePlanViewModel(steps, plan.RequestedRestorePoint);
     }
 
-    private static RestoreStepViewModel ToStep(BackupJob job, bool isStopAt)
+    private static RestoreStepViewModel ToStep(BackupJob job, bool isStopAt, int order)
     {
         return new RestoreStepViewModel(
-            type: job.BackupType switch
+            stepType: job.BackupType switch
             {
                 BackupType.Full => "FULL",
                 BackupType.Differential => "DIFF",
                 BackupType.TransactionLog => "LOG",
                 _ => job.BackupType.ToString().ToUpperInvariant()
             },
-            fileName: Path.GetFileName(job.BackupFilePath),
-            completedAt: job.EndTime ?? job.StartTime,
-            isStopAt: isStopAt);
+            displayName: Path.GetFileName(job.BackupFilePath),
+            isStopAt: isStopAt,
+            order: order,
+            isLast: false);
     }
 
     private void SyncValidationCollections(RestoreValidationResult validation)
@@ -385,16 +406,18 @@ public sealed class RestorePlanViewModel
 
 public sealed class RestoreStepViewModel
 {
-    public RestoreStepViewModel(string type, string fileName, DateTime completedAt, bool isStopAt)
+    public RestoreStepViewModel(string stepType, string displayName, bool isStopAt, int order, bool isLast)
     {
-        Type = type;
-        FileName = fileName;
-        CompletedAt = completedAt;
+        StepType = stepType;
+        DisplayName = displayName;
         IsStopAt = isStopAt;
+        Order = order;
+        IsLast = isLast;
     }
 
-    public string Type { get; }
-    public string FileName { get; }
-    public DateTime CompletedAt { get; }
+    public string StepType { get; }
+    public string DisplayName { get; }
     public bool IsStopAt { get; }
+    public int Order { get; }
+    public bool IsLast { get; }
 }

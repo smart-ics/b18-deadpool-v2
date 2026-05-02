@@ -15,6 +15,7 @@
         Background="{StaticResource BackgroundBrush}">
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+        <views:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibility" />
         <views:BoolToValidationTextConverter x:Key="BoolToValidationTextConverter" />
         <views:BoolToBrushConverter x:Key="BoolToBrushConverter" />
     </Window.Resources>
@@ -102,28 +103,53 @@
                            Style="{StaticResource PanelHeadingTextStyle}"
                            Text="Restore Plan" />
 
-                <ListView Grid.Row="1"
-                          ItemsSource="{Binding Plan.Steps}">
-                    <ListView.View>
-                        <GridView>
-                            <GridViewColumn Header="Step" Width="110" DisplayMemberBinding="{Binding Type}" />
-                            <GridViewColumn Header="Backup File" Width="350" DisplayMemberBinding="{Binding FileName}" />
-                            <GridViewColumn Header="Timestamp" Width="200" DisplayMemberBinding="{Binding CompletedAt, StringFormat={}{0:yyyy-MM-dd HH:mm:ss}}" />
-                            <GridViewColumn Header="Marker" Width="170">
-                                <GridViewColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <Border CornerRadius="4" Padding="6,2" Background="#3A7A3A">
-                                            <TextBlock Text="STOPAT"
+                <ItemsControl Grid.Row="1" ItemsSource="{Binding Plan.Steps}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Margin="0,0,0,4">
+                                <Border CornerRadius="6" Padding="10,8" BorderBrush="#2B3B4A" BorderThickness="1" Background="#13212C">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="80" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="120" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <TextBlock Grid.Column="0"
+                                                   Text="{Binding StepType}"
+                                                   Foreground="#7CC2FF"
+                                                   FontWeight="Bold"
+                                                   VerticalAlignment="Center" />
+
+                                        <TextBlock Grid.Column="1"
+                                                   Text="{Binding DisplayName}"
+                                                   Foreground="{StaticResource TextBrush}"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   VerticalAlignment="Center" />
+
+                                        <Border Grid.Column="2"
+                                                CornerRadius="4"
+                                                Padding="6,2"
+                                                Background="#9A7B00"
+                                                HorizontalAlignment="Right"
+                                                Visibility="{Binding IsStopAt, Converter={StaticResource BoolToVisibility}}">
+                                            <TextBlock Text="(STOPAT)"
                                                        FontWeight="Bold"
-                                                       Foreground="White"
-                                                       Visibility="{Binding IsStopAt, Converter={StaticResource BoolToVisibility}}" />
+                                                       Foreground="Black" />
                                         </Border>
-                                    </DataTemplate>
-                                </GridViewColumn.CellTemplate>
-                            </GridViewColumn>
-                        </GridView>
-                    </ListView.View>
-                </ListView>
+                                    </Grid>
+                                </Border>
+
+                                <TextBlock Text="↓"
+                                           HorizontalAlignment="Center"
+                                           Foreground="{StaticResource MutedTextBrush}"
+                                           FontSize="18"
+                                           Margin="0,2,0,2"
+                                           Visibility="{Binding IsLast, Converter={StaticResource InverseBoolToVisibility}}" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
             </Grid>
         </Border>
 
