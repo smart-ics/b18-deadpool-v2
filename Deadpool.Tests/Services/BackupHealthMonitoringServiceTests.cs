@@ -31,9 +31,9 @@ public class BackupHealthMonitoringServiceTests
     {
         var policy = CreateFullRecoveryPolicy();
 
-        var fullBackup = CreateCompletedJob("TestDB", BackupType.Full, DateTime.UtcNow.AddHours(-12));
-        var diffBackup = CreateCompletedJob("TestDB", BackupType.Differential, DateTime.UtcNow.AddHours(-2));
-        var logBackup = CreateCompletedJob("TestDB", BackupType.TransactionLog, DateTime.UtcNow.AddMinutes(-10));
+        var fullBackup = CreateCompletedJob("TestDB", BackupType.Full, DateTime.Now.AddHours(-12));
+        var diffBackup = CreateCompletedJob("TestDB", BackupType.Differential, DateTime.Now.AddHours(-2));
+        var logBackup = CreateCompletedJob("TestDB", BackupType.TransactionLog, DateTime.Now.AddMinutes(-10));
 
         await _repository.CreateAsync(fullBackup);
         await _repository.CreateAsync(diffBackup);
@@ -65,7 +65,7 @@ public class BackupHealthMonitoringServiceTests
     {
         var policy = CreateFullRecoveryPolicy();
 
-        var fullBackup = CreateCompletedJob("TestDB", BackupType.Full, DateTime.UtcNow.AddHours(-30));
+        var fullBackup = CreateCompletedJob("TestDB", BackupType.Full, DateTime.Now.AddHours(-30));
         await _repository.CreateAsync(fullBackup);
 
         var result = await _service.CheckDatabaseHealthAsync("TestDB", policy);
@@ -79,8 +79,8 @@ public class BackupHealthMonitoringServiceTests
     {
         var policy = CreateFullRecoveryPolicy();
 
-        var fullBackup = CreateCompletedJob("TestDB", BackupType.Full, DateTime.UtcNow.AddHours(-12));
-        var diffBackup = CreateCompletedJob("TestDB", BackupType.Differential, DateTime.UtcNow.AddHours(-8));
+        var fullBackup = CreateCompletedJob("TestDB", BackupType.Full, DateTime.Now.AddHours(-12));
+        var diffBackup = CreateCompletedJob("TestDB", BackupType.Differential, DateTime.Now.AddHours(-8));
 
         await _repository.CreateAsync(fullBackup);
         await _repository.CreateAsync(diffBackup);
@@ -96,8 +96,8 @@ public class BackupHealthMonitoringServiceTests
     {
         var policy = CreateFullRecoveryPolicy();
 
-        var fullBackup = CreateCompletedJob("TestDB", BackupType.Full, DateTime.UtcNow.AddHours(-12));
-        var logBackup = CreateCompletedJob("TestDB", BackupType.TransactionLog, DateTime.UtcNow.AddMinutes(-45));
+        var fullBackup = CreateCompletedJob("TestDB", BackupType.Full, DateTime.Now.AddHours(-12));
+        var logBackup = CreateCompletedJob("TestDB", BackupType.TransactionLog, DateTime.Now.AddMinutes(-45));
 
         await _repository.CreateAsync(fullBackup);
         await _repository.CreateAsync(logBackup);
@@ -113,7 +113,7 @@ public class BackupHealthMonitoringServiceTests
     {
         var policy = CreateFullRecoveryPolicy();
 
-        var fullBackup = CreateCompletedJob("TestDB", BackupType.Full, DateTime.UtcNow.AddHours(-12));
+        var fullBackup = CreateCompletedJob("TestDB", BackupType.Full, DateTime.Now.AddHours(-12));
         await _repository.CreateAsync(fullBackup);
 
         var result = await _service.CheckDatabaseHealthAsync("TestDB", policy);
@@ -127,7 +127,7 @@ public class BackupHealthMonitoringServiceTests
     {
         var policy = CreateSimpleRecoveryPolicy();
 
-        var fullBackup = CreateCompletedJob("TestDB", BackupType.Full, DateTime.UtcNow.AddHours(-12));
+        var fullBackup = CreateCompletedJob("TestDB", BackupType.Full, DateTime.Now.AddHours(-12));
         await _repository.CreateAsync(fullBackup);
 
         var result = await _service.CheckDatabaseHealthAsync("TestDB", policy);
@@ -142,8 +142,8 @@ public class BackupHealthMonitoringServiceTests
     {
         var policy = CreateFullRecoveryPolicy();
 
-        var diffBackup = CreateCompletedJob("TestDB", BackupType.Differential, DateTime.UtcNow.AddHours(-2));
-        var logBackup = CreateCompletedJob("TestDB", BackupType.TransactionLog, DateTime.UtcNow.AddMinutes(-10));
+        var diffBackup = CreateCompletedJob("TestDB", BackupType.Differential, DateTime.Now.AddHours(-2));
+        var logBackup = CreateCompletedJob("TestDB", BackupType.TransactionLog, DateTime.Now.AddMinutes(-10));
 
         await _repository.CreateAsync(diffBackup);
         await _repository.CreateAsync(logBackup);
@@ -159,9 +159,9 @@ public class BackupHealthMonitoringServiceTests
     {
         var policy = CreateFullRecoveryPolicy();
 
-        var fullBackup = CreateCompletedJob("TestDB", BackupType.Full, DateTime.UtcNow.AddHours(-12));
-        var logBackup1 = CreateCompletedJob("TestDB", BackupType.TransactionLog, DateTime.UtcNow.AddHours(-6));
-        var logBackup2 = CreateCompletedJob("TestDB", BackupType.TransactionLog, DateTime.UtcNow.AddMinutes(-10));
+        var fullBackup = CreateCompletedJob("TestDB", BackupType.Full, DateTime.Now.AddHours(-12));
+        var logBackup1 = CreateCompletedJob("TestDB", BackupType.TransactionLog, DateTime.Now.AddHours(-6));
+        var logBackup2 = CreateCompletedJob("TestDB", BackupType.TransactionLog, DateTime.Now.AddMinutes(-10));
 
         await _repository.CreateAsync(fullBackup);
         await _repository.CreateAsync(logBackup1);
@@ -178,9 +178,9 @@ public class BackupHealthMonitoringServiceTests
     {
         var policy = CreateFullRecoveryPolicy();
 
-        var fullBackup = CreateCompletedJob("TestDB", BackupType.Full, DateTime.UtcNow.AddHours(-12));
-        var logBackup1 = CreateCompletedJob("TestDB", BackupType.TransactionLog, DateTime.UtcNow.AddHours(-6));
-        var diffBackup = CreateCompletedJob("TestDB", BackupType.Differential, DateTime.UtcNow.AddHours(-2));
+        var fullBackup = CreateCompletedJob("TestDB", BackupType.Full, DateTime.Now.AddHours(-12));
+        var logBackup1 = CreateCompletedJob("TestDB", BackupType.TransactionLog, DateTime.Now.AddHours(-6));
+        var diffBackup = CreateCompletedJob("TestDB", BackupType.Differential, DateTime.Now.AddHours(-2));
 
         await _repository.CreateAsync(fullBackup);
         await _repository.CreateAsync(logBackup1);
@@ -197,8 +197,8 @@ public class BackupHealthMonitoringServiceTests
     {
         var policy = CreateFullRecoveryPolicy();
 
-        var fullBackup = CreateCompletedJob("TestDB", BackupType.Full, DateTime.UtcNow.AddHours(-12));
-        var failedBackup = CreateFailedJob("TestDB", BackupType.Differential, DateTime.UtcNow.AddHours(-1));
+        var fullBackup = CreateCompletedJob("TestDB", BackupType.Full, DateTime.Now.AddHours(-12));
+        var failedBackup = CreateFailedJob("TestDB", BackupType.Differential, DateTime.Now.AddHours(-1));
 
         await _repository.CreateAsync(fullBackup);
         await _repository.CreateAsync(failedBackup);
@@ -297,7 +297,7 @@ public class BackupHealthMonitoringServiceTests
     {
         var policy = CreateFullRecoveryPolicy();
 
-        var fullBackup = CreateCompletedJob("TestDB", BackupType.Full, DateTime.UtcNow.AddHours(-12));
+        var fullBackup = CreateCompletedJob("TestDB", BackupType.Full, DateTime.Now.AddHours(-12));
         await _repository.CreateAsync(fullBackup);
 
         var result = await _service.CheckDatabaseHealthAsync("TestDB", policy);
@@ -312,15 +312,15 @@ public class BackupHealthMonitoringServiceTests
     {
         var policy = CreateFullRecoveryPolicy();
 
-        var startTime = DateTime.UtcNow.AddHours(-30);
-        var endTime = DateTime.UtcNow.AddHours(-12);
+        var startTime = DateTime.Now.AddHours(-30);
+        var endTime = DateTime.Now.AddHours(-12);
 
         var fullBackup = CreateCompletedJobWithEndTime("TestDB", BackupType.Full, startTime, endTime);
         await _repository.CreateAsync(fullBackup);
 
         // Add recent differential and log backups so the test focuses on completion time usage
-        var diffBackup = CreateCompletedJob("TestDB", BackupType.Differential, DateTime.UtcNow.AddHours(-2));
-        var logBackup = CreateCompletedJob("TestDB", BackupType.TransactionLog, DateTime.UtcNow.AddMinutes(-10));
+        var diffBackup = CreateCompletedJob("TestDB", BackupType.Differential, DateTime.Now.AddHours(-2));
+        var logBackup = CreateCompletedJob("TestDB", BackupType.TransactionLog, DateTime.Now.AddMinutes(-10));
         await _repository.CreateAsync(diffBackup);
         await _repository.CreateAsync(logBackup);
 
@@ -335,8 +335,8 @@ public class BackupHealthMonitoringServiceTests
     {
         var policy = CreateFullRecoveryPolicy();
 
-        var fullBackup = CreateCompletedJob("TestDB", BackupType.Full, DateTime.UtcNow.AddHours(-12));
-        var failedBackup = CreateFailedJob("TestDB", BackupType.Differential, DateTime.UtcNow.AddHours(-2));
+        var fullBackup = CreateCompletedJob("TestDB", BackupType.Full, DateTime.Now.AddHours(-12));
+        var failedBackup = CreateFailedJob("TestDB", BackupType.Differential, DateTime.Now.AddHours(-2));
 
         await _repository.CreateAsync(fullBackup);
         await _repository.CreateAsync(failedBackup);
@@ -352,8 +352,8 @@ public class BackupHealthMonitoringServiceTests
     {
         var policy = CreateFullRecoveryPolicy();
 
-        var fullBackup = CreateCompletedJob("TestDB", BackupType.Full, DateTime.UtcNow.AddHours(-12));
-        var failedBackup = CreateFailedJob("TestDB", BackupType.Differential, DateTime.UtcNow.AddHours(-30));
+        var fullBackup = CreateCompletedJob("TestDB", BackupType.Full, DateTime.Now.AddHours(-12));
+        var failedBackup = CreateFailedJob("TestDB", BackupType.Differential, DateTime.Now.AddHours(-30));
 
         await _repository.CreateAsync(fullBackup);
         await _repository.CreateAsync(failedBackup);
@@ -373,14 +373,14 @@ public class BackupHealthMonitoringServiceTests
 
         typeof(BackupJob)
             .GetField("<StartTime>k__BackingField", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
-            ?.SetValue(fullBackup, DateTime.UtcNow.AddHours(-12));
+            ?.SetValue(fullBackup, DateTime.Now.AddHours(-12));
 
         fullBackup.MarkAsRunning();
         fullBackup.MarkAsCompleted(1024);
 
         typeof(BackupJob)
             .GetField("<EndTime>k__BackingField", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
-            ?.SetValue(fullBackup, DateTime.UtcNow.AddHours(-12).AddMinutes(5));
+            ?.SetValue(fullBackup, DateTime.Now.AddHours(-12).AddMinutes(5));
 
         await _repository.CreateAsync(fullBackup);
 

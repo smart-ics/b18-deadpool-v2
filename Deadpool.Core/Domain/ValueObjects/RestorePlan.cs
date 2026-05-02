@@ -112,7 +112,15 @@ public sealed class RestorePlan
         if (!IsValid)
             return $"Invalid restore plan: {FailureReason}";
 
-        var description = $"Restore {DatabaseName} to {ActualRestorePoint:yyyy-MM-dd HH:mm:ss}\n";
+        // Determine if this is a point-in-time restore (STOPAT): the actual restore
+        // point falls within a log file rather than at the end of the last log.
+        var isPointInTime = LogBackups.Count > 0
+            && ActualRestorePoint.HasValue
+            && ActualRestorePoint.Value < LogBackups[LogBackups.Count - 1].EndTime;
+
+        var description = isPointInTime
+            ? $"Point-in-time restore of {DatabaseName} to {ActualRestorePoint:yyyy-MM-dd HH:mm:ss}\n"
+            : $"Restore {DatabaseName} to {ActualRestorePoint:yyyy-MM-dd HH:mm:ss}\n";
         description += $"Sequence: {RestoreSequence.Count} backup(s)\n";
         description += $"- Full: {FullBackup?.StartTime:yyyy-MM-dd HH:mm:ss}\n";
 

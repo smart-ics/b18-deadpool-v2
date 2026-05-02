@@ -51,7 +51,7 @@ public sealed class BackupSchedulerWorker : BackgroundService
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            await TickAsync(DateTime.Now, stoppingToken);
+            await TickAsync(DateTime.UtcNow, stoppingToken);
             await Task.Delay(PollingInterval, stoppingToken);
         }
 
@@ -74,10 +74,12 @@ public sealed class BackupSchedulerWorker : BackgroundService
                     var last = recent.FirstOrDefault(j => j.BackupType == backupType);
                     if (last != null)
                     {
-                        _tracker.MarkScheduled(db.DatabaseName, backupType, last.StartTime);
+                        // StartTime is local time; tracker uses UTC for Cronos comparisons.
+                        var startTimeUtc = last.StartTime.ToUniversalTime();
+                        _tracker.MarkScheduled(db.DatabaseName, backupType, startTimeUtc);
                         _logger.LogDebug(
                             "Seeded tracker {Db}/{Type} from repository: {Time:u}",
-                            db.DatabaseName, backupType, last.StartTime);
+                            db.DatabaseName, backupType, startTimeUtc);
                     }
                 }
                 catch (Exception ex)
@@ -91,7 +93,8 @@ public sealed class BackupSchedulerWorker : BackgroundService
     }
 
     // Main tick — separated from the loop for testability.
-    internal async Task TickAsync(DateTime now, CancellationToken ct)
+    // nowUtc must be a UTC DateTime (DateTimeKind.Utc).
+    internal async Task TickAsync(DateTime nowUtc, CancellationToken ct)
     {
         foreach (var db in _databases)
         {
@@ -103,7 +106,7 @@ public sealed class BackupSchedulerWorker : BackgroundService
 
                 try
                 {
-                    await TryScheduleAsync(db.DatabaseName, backupType, schedule, now);
+                    await TryScheduleAsync(db.DatabaseName, backupType, schedule, nowUtc);
                 }
                 catch (Exception ex)
                 {
@@ -121,7 +124,7 @@ public sealed class BackupSchedulerWorker : BackgroundService
         string databaseName,
         BackupType backupType,
         BackupSchedule schedule,
-        DateTime now)
+        DateTime nowUtc)
     {
         // Domain safety rule: Differential and Log backups require an initialized chain.
         if (backupType != BackupType.Full)
@@ -138,36 +141,38 @@ public sealed class BackupSchedulerWorker : BackgroundService
 
         var lastScheduled = _tracker.GetLastScheduled(databaseName, backupType);
 
-        if (!schedule.IsDue(lastScheduled, now))
+        if (!schedule.IsDue(lastScheduled, nowUtc))
             return;
 
         // Use the most recent occurrence as the canonical anchor, not necessarily the
         // first one.  This ensures repeated ticks within the same inter-occurrence
         // window always advance the tracker to the same point, preventing duplicates.
-        var occurrence = schedule.GetMostRecentOccurrence(lastScheduled, now)!.Value;
+        var occurrenceUtc = schedule.GetMostRecentOccurrence(lastScheduled, nowUtc)!.Value;
 
         _logger.LogInformation(
-            "Scheduling {Type} backup for {Db} (occurrence {Occurrence}).",
-            backupType, databaseName, occurrence);
+            "Scheduling {Type} backup for {Db} (occurrence {Occurrence:u}).",
+            backupType, databaseName, occurrenceUtc);
 
+        // Placeholder filename uses local time so the operator sees a human-readable timestamp.
         var job = new BackupJob(
             databaseName,
             backupType,
-            BuildPlaceholderPath(databaseName, backupType, occurrence));
+            BuildPlaceholderPath(databaseName, backupType, occurrenceUtc.ToLocalTime()));
 
         await _jobRepository.CreateAsync(job);
 
         // Update tracker only after the job was successfully persisted.
-        _tracker.MarkScheduled(databaseName, backupType, occurrence);
+        _tracker.MarkScheduled(databaseName, backupType, occurrenceUtc);
 
         _logger.LogInformation(
             "Scheduled {Type} backup job created for {Db}.", backupType, databaseName);
     }
 
-    // The real file path is assigned by BackupExecutorWorker (P0-006) when it picks
-    // up the pending job. We write a recognisable placeholder here.
+    // The real file path is assigned by BackupExecutorWorker when it picks up the pending
+    // job. We write a recognisable placeholder here using LOCAL time so operators can
+    // read the timestamp at a glance.
     private static string BuildPlaceholderPath(
-        string databaseName, BackupType backupType, DateTime occurrence)
+        string databaseName, BackupType backupType, DateTime occurrenceLocal)
     {
         var ext = backupType == BackupType.TransactionLog ? "trn" : "bak";
         var tag = backupType switch
@@ -177,7 +182,7 @@ public sealed class BackupSchedulerWorker : BackgroundService
             BackupType.TransactionLog => "LOG",
             _ => "UNKNOWN"
         };
-        return $"PENDING_{databaseName}_{tag}_{occurrence:yyyyMMdd_HHmm}.{ext}";
+        return $"PENDING_{databaseName}_{tag}_{occurrenceLocal:yyyyMMdd_HHmm}.{ext}";
     }
 
     // Internal value type used only by this worker to pair each schedule with its type.

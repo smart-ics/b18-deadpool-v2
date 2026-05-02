@@ -19,9 +19,9 @@ public class BackupHealthMonitoringWorkerTests
         var jobRepo = new InMemoryBackupJobRepository();
         var healthCheckRepo = new InMemoryBackupHealthCheckRepository();
 
-        var fullBackup = CreateCompletedJob("TestDB", BackupType.Full, DateTime.UtcNow.AddHours(-12));
-        var diffBackup = CreateCompletedJob("TestDB", BackupType.Differential, DateTime.UtcNow.AddHours(-2));
-        var logBackup = CreateCompletedJob("TestDB", BackupType.TransactionLog, DateTime.UtcNow.AddMinutes(-10));
+        var fullBackup = CreateCompletedJob("TestDB", BackupType.Full, DateTime.Now.AddHours(-12));
+        var diffBackup = CreateCompletedJob("TestDB", BackupType.Differential, DateTime.Now.AddHours(-2));
+        var logBackup = CreateCompletedJob("TestDB", BackupType.TransactionLog, DateTime.Now.AddMinutes(-10));
 
         await jobRepo.CreateAsync(fullBackup);
         await jobRepo.CreateAsync(diffBackup);
@@ -154,7 +154,7 @@ public class BackupHealthMonitoringWorkerTests
         var jobRepo = new InMemoryBackupJobRepository();
         var healthCheckRepo = new InMemoryBackupHealthCheckRepository();
 
-        var fullBackup = CreateCompletedJob("TestDB", BackupType.Full, DateTime.UtcNow.AddHours(-30));
+        var fullBackup = CreateCompletedJob("TestDB", BackupType.Full, DateTime.Now.AddHours(-30));
         await jobRepo.CreateAsync(fullBackup);
 
         var policies = new List<DatabaseBackupPolicyOptions>
@@ -221,8 +221,8 @@ public class BackupHealthMonitoringWorkerTests
         var jobRepo = new InMemoryBackupJobRepository();
         var healthCheckRepo = new InMemoryBackupHealthCheckRepository();
 
-        var fullBackup1 = CreateCompletedJob("DB1", BackupType.Full, DateTime.UtcNow.AddHours(-12));
-        var fullBackup2 = CreateCompletedJob("DB2", BackupType.Full, DateTime.UtcNow.AddHours(-12));
+        var fullBackup1 = CreateCompletedJob("DB1", BackupType.Full, DateTime.Now.AddHours(-12));
+        var fullBackup2 = CreateCompletedJob("DB2", BackupType.Full, DateTime.Now.AddHours(-12));
 
         await jobRepo.CreateAsync(fullBackup1);
         await jobRepo.CreateAsync(fullBackup2);
