@@ -131,6 +131,8 @@ static class Program
         services.AddSingleton<IBackupJobMonitoringService, BackupJobMonitoringService>();
         services.AddSingleton<ICronScheduleDescriptionService, CronScheduleDescriptionService>();
         services.AddSingleton<IBackupPolicyDisplayFormatter, BackupPolicyDisplayFormatter>();
+        services.AddScoped<IRestorePlanValidatorService, RestorePlanValidatorService>();
+        services.AddScoped<IRestoreExecutionService, RestoreExecutionService>();
     }
 
 }

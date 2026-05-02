@@ -196,6 +196,8 @@ builder.Services.AddSingleton<BackupService>();
 // Bootstrap state tracker and initialization service
 builder.Services.AddSingleton<IBootstrapStateTracker, InMemoryBootstrapStateTracker>();
 builder.Services.AddSingleton<IBackupChainInitializationService, BackupChainInitializationService>();
+builder.Services.AddScoped<IRestorePlanValidatorService, RestorePlanValidatorService>();
+builder.Services.AddScoped<IRestoreExecutionService, RestoreExecutionService>();
 
 // Hosted workers.
 // Safety note: all BackgroundService.ExecuteAsync methods start concurrently —

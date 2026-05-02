@@ -26,6 +26,7 @@ public sealed class RestorePlanValidatorService : IRestorePlanValidatorService
         ArgumentNullException.ThrowIfNull(plan);
 
         var result = new RestoreValidationResult();
+        var orderedLogs = NormalizeAndValidateLogOrder(plan, result);
 
         if (!plan.IsValid)
         {
@@ -43,16 +44,16 @@ public sealed class RestorePlanValidatorService : IRestorePlanValidatorService
             return result;
         }
 
-        ValidateFileSet(plan, result);
-        ValidateChainConsistency(plan, result);
-        ValidateStopAtCoverage(plan, result);
+        ValidateFileSet(plan, orderedLogs, result);
+        ValidateChainConsistency(plan, orderedLogs, result);
+        ValidateStopAtCoverage(plan, orderedLogs, result);
 
         return result;
     }
 
-    private void ValidateFileSet(RestorePlan plan, RestoreValidationResult result)
+    private void ValidateFileSet(RestorePlan plan, IReadOnlyList<BackupJob> orderedLogs, RestoreValidationResult result)
     {
-        var orderedBackups = BuildOrderedBackups(plan);
+        var orderedBackups = BuildOrderedBackups(plan, orderedLogs);
 
         foreach (var backup in orderedBackups)
         {
@@ -104,7 +105,7 @@ public sealed class RestorePlanValidatorService : IRestorePlanValidatorService
         }
     }
 
-    private void ValidateChainConsistency(RestorePlan plan, RestoreValidationResult result)
+    private void ValidateChainConsistency(RestorePlan plan, IReadOnlyList<BackupJob> orderedLogs, RestoreValidationResult result)
     {
         var fullBackup = plan.FullBackup!;
 
@@ -152,12 +153,12 @@ public sealed class RestorePlanValidatorService : IRestorePlanValidatorService
             }
         }
 
-        ValidateLogChain(plan, result);
+        ValidateLogChain(plan, orderedLogs, result);
     }
 
-    private void ValidateLogChain(RestorePlan plan, RestoreValidationResult result)
+    private void ValidateLogChain(RestorePlan plan, IReadOnlyList<BackupJob> orderedLogs, RestoreValidationResult result)
     {
-        var logs = plan.LogBackups;
+        var logs = orderedLogs;
         if (logs.Count == 0)
             return;
 
@@ -218,7 +219,7 @@ public sealed class RestorePlanValidatorService : IRestorePlanValidatorService
         }
     }
 
-    private void ValidateStopAtCoverage(RestorePlan plan, RestoreValidationResult result)
+    private void ValidateStopAtCoverage(RestorePlan plan, IReadOnlyList<BackupJob> orderedLogs, RestoreValidationResult result)
     {
         var baseBackup = plan.DifferentialBackup ?? plan.FullBackup!;
         var targetTime = plan.TargetTime;
@@ -234,7 +235,7 @@ public sealed class RestorePlanValidatorService : IRestorePlanValidatorService
         if (targetTime <= baseBackup.EndTime.Value)
             return;
 
-        if (plan.LogBackups.Count == 0)
+        if (orderedLogs.Count == 0)
         {
             var message = $"Restore target {targetTime:yyyy-MM-dd HH:mm:ss} requires transaction log backups, but none are available.";
             result.AddError(message);
@@ -242,8 +243,8 @@ public sealed class RestorePlanValidatorService : IRestorePlanValidatorService
             return;
         }
 
-        var firstLog = plan.LogBackups.First();
-        var lastLog = plan.LogBackups.Last();
+        var firstLog = orderedLogs.First();
+        var lastLog = orderedLogs.Last();
 
         if (targetTime < firstLog.StartTime)
         {
@@ -272,7 +273,27 @@ public sealed class RestorePlanValidatorService : IRestorePlanValidatorService
         }
     }
 
-    private static List<BackupJob> BuildOrderedBackups(RestorePlan plan)
+    private List<BackupJob> NormalizeAndValidateLogOrder(RestorePlan plan, RestoreValidationResult result)
+    {
+        var inputLogs = plan.LogBackups.ToList();
+
+        var orderedLogs = inputLogs
+            .OrderBy(l => l.StartTime)
+            .ThenBy(l => l.EndTime ?? DateTime.MaxValue)
+            .ThenBy(l => l.BackupFilePath, StringComparer.Ordinal)
+            .ToList();
+
+        if (!inputLogs.SequenceEqual(orderedLogs))
+        {
+            const string message = "Transaction log backups are not in chronological order. Validation requires deterministic ordering.";
+            result.AddError(message);
+            _logger.LogError("Chain inconsistency: {Message}", message);
+        }
+
+        return orderedLogs;
+    }
+
+    private static List<BackupJob> BuildOrderedBackups(RestorePlan plan, IReadOnlyList<BackupJob> orderedLogs)
     {
         var backups = new List<BackupJob>
         {
@@ -282,7 +303,7 @@ public sealed class RestorePlanValidatorService : IRestorePlanValidatorService
         if (plan.DifferentialBackup != null)
             backups.Add(plan.DifferentialBackup);
 
-        backups.AddRange(plan.LogBackups);
+        backups.AddRange(orderedLogs);
         return backups;
     }
 
@@ -290,6 +311,15 @@ public sealed class RestorePlanValidatorService : IRestorePlanValidatorService
     {
         if (string.IsNullOrWhiteSpace(path))
             return false;
+
+        try
+        {
+            _ = Path.GetFullPath(path);
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return false;
+        }
 
         return !path.StartsWith(PendingPathPrefix, StringComparison.OrdinalIgnoreCase);
     }

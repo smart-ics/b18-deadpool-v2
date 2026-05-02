@@ -108,6 +108,8 @@ public partial class App : Application
 		});
 
 		services.AddSingleton<IDashboardMonitoringService, DashboardMonitoringService>();
+		services.AddScoped<IRestorePlanValidatorService, RestorePlanValidatorService>();
+		services.AddScoped<IRestoreExecutionService, RestoreExecutionService>();
 		services.AddSingleton<MainWindow>();
 
 		services.AddSingleton<DashboardViewModel>(sp =>
