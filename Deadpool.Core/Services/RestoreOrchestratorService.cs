@@ -59,73 +59,76 @@ public sealed class RestoreOrchestratorService : IRestoreOrchestratorService
     {
         var databaseName = ResolveDatabaseName();
 
-        var plan = await _planner.BuildRestorePlanAsync(databaseName, targetTime);
-
-        var validation = _validator.Validate(plan);
-        if (!validation.IsValid)
-        {
-            var message = "Restore validation failed: " + string.Join("; ", validation.Errors);
-            _logger.LogError("Restore orchestration blocked by validation. Errors: {Errors}", validation.Errors);
-            throw new InvalidOperationException(message);
-        }
-
-        var effectiveConfirmation = new RestoreConfirmationContext
-        {
-            DatabaseName = plan.DatabaseName,
-            Confirmed = confirmationContext.Confirmed,
-            ConfirmationText = confirmationContext.ConfirmationText,
-            RequireTextMatch = confirmationContext.RequireTextMatch
-        };
-
-        _safetyGuard.EnsureConfirmed(effectiveConfirmation);
-
         var executionStartUtc = DateTime.UtcNow;
-        RestoreExecutionResult executionResult;
+        RestorePlan? plan = null;
+        var executionResult = new RestoreExecutionResult
+        {
+            Success = false
+        };
 
         try
         {
+            plan = await _planner.BuildRestorePlanAsync(databaseName, targetTime);
+
+            var validation = _validator.Validate(plan);
+            if (!validation.IsValid)
+            {
+                var message = "Restore validation failed: " + string.Join("; ", validation.Errors);
+                _logger.LogError("Restore orchestration blocked by validation. Errors: {Errors}", validation.Errors);
+                throw new InvalidOperationException(message);
+            }
+
+            var effectiveConfirmation = new RestoreConfirmationContext
+            {
+                DatabaseName = plan.DatabaseName,
+                Confirmed = confirmationContext.Confirmed,
+                ConfirmationText = confirmationContext.ConfirmationText,
+                RequireTextMatch = confirmationContext.RequireTextMatch
+            };
+
+            _safetyGuard.EnsureConfirmed(effectiveConfirmation);
+
             executionResult = await _executor.ExecuteAsync(
                 plan,
                 _orchestratorOptions.Value.AllowOverwrite,
                 cancellationToken);
+
+            if (!executionResult.Success)
+            {
+                var message = string.IsNullOrWhiteSpace(executionResult.ErrorMessage)
+                    ? "Restore execution failed."
+                    : executionResult.ErrorMessage;
+
+                _logger.LogError(
+                    "Restore execution failed for {DatabaseName}. Steps executed: {StepCount}. Error: {Error}",
+                    plan.DatabaseName,
+                    executionResult.Steps.Count,
+                    message);
+
+                throw new InvalidOperationException("Restore execution failed: " + message);
+            }
+
+            _logger.LogInformation(
+                "Restore orchestration completed successfully for {DatabaseName}. Steps executed: {StepCount}.",
+                plan.DatabaseName,
+                executionResult.Steps.Count);
         }
         catch (Exception ex)
         {
-            executionResult = new RestoreExecutionResult
-            {
-                Success = false,
-                ErrorMessage = ex.Message
-            };
-
-            await TrySaveRestoreHistoryAsync(plan, executionStartUtc, executionResult);
+            executionResult.Success = false;
+            executionResult.ErrorMessage = ex.Message;
             throw;
         }
-
-        await TrySaveRestoreHistoryAsync(plan, executionStartUtc, executionResult);
-
-        if (!executionResult.Success)
+        finally
         {
-            var message = string.IsNullOrWhiteSpace(executionResult.ErrorMessage)
-                ? "Restore execution failed."
-                : executionResult.ErrorMessage;
-
-            _logger.LogError(
-                "Restore execution failed for {DatabaseName}. Steps executed: {StepCount}. Error: {Error}",
-                plan.DatabaseName,
-                executionResult.Steps.Count,
-                message);
-
-            throw new InvalidOperationException("Restore execution failed: " + message);
+            await TrySaveRestoreHistoryAsync(plan, databaseName, targetTime, executionStartUtc, executionResult);
         }
-
-        _logger.LogInformation(
-            "Restore orchestration completed successfully for {DatabaseName}. Steps executed: {StepCount}.",
-            plan.DatabaseName,
-            executionResult.Steps.Count);
     }
 
     private async Task TrySaveRestoreHistoryAsync(
-        RestorePlan plan,
+        RestorePlan? plan,
+        string fallbackDatabaseName,
+        DateTime targetTime,
         DateTime executionStartUtc,
         RestoreExecutionResult executionResult)
     {
@@ -136,12 +139,12 @@ public sealed class RestoreOrchestratorService : IRestoreOrchestratorService
 
             var record = new RestoreHistoryRecord
             {
-                DatabaseName = plan.DatabaseName,
+                DatabaseName = plan?.DatabaseName ?? fallbackDatabaseName,
                 RestoreTimestamp = executionStartUtc,
-                TargetRestoreTime = plan.TargetTime,
-                FullBackupFile = plan.FullBackup?.BackupFilePath ?? string.Empty,
-                DiffBackupFile = plan.DifferentialBackup?.BackupFilePath,
-                LogBackupFiles = plan.LogBackups.Select(x => x.BackupFilePath).ToList(),
+                TargetRestoreTime = plan?.TargetTime ?? targetTime,
+                FullBackupFile = plan?.FullBackup?.BackupFilePath ?? string.Empty,
+                DiffBackupFile = plan?.DifferentialBackup?.BackupFilePath,
+                LogBackupFiles = plan?.LogBackups.Select(x => x.BackupFilePath).ToList() ?? new List<string>(),
                 Success = executionResult.Success,
                 DurationMs = durationMs,
                 ErrorMessage = executionResult.ErrorMessage
@@ -154,7 +157,7 @@ public sealed class RestoreOrchestratorService : IRestoreOrchestratorService
             _logger.LogWarning(
                 ex,
                 "Failed to persist restore history for {DatabaseName}. Restore execution result remains unchanged.",
-                plan.DatabaseName);
+                plan?.DatabaseName ?? fallbackDatabaseName);
         }
     }
 

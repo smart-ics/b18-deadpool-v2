@@ -51,6 +51,15 @@ public class RestoreOrchestratorServiceTests
         _safetyGuardMock.Verify(
             s => s.EnsureConfirmed(It.IsAny<RestoreConfirmationContext>()),
             Times.Never);
+
+        _historyRepositoryMock.Verify(
+            h => h.SaveAsync(It.Is<RestoreHistoryRecord>(r =>
+                r.DatabaseName == "TestDB" &&
+                !r.Success &&
+                r.ErrorMessage != null &&
+                r.ErrorMessage.Contains("Restore validation failed") &&
+                r.FullBackupFile == @"C:\Backups\full.bak")),
+            Times.Once);
     }
 
     [Fact]
@@ -130,6 +139,15 @@ public class RestoreOrchestratorServiceTests
         _executorMock.Verify(
             e => e.ExecuteAsync(It.IsAny<RestorePlan>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()),
             Times.Never);
+
+        _historyRepositoryMock.Verify(
+            h => h.SaveAsync(It.Is<RestoreHistoryRecord>(r =>
+                r.DatabaseName == "TestDB" &&
+                !r.Success &&
+                r.ErrorMessage != null &&
+                r.ErrorMessage.Contains("Restore not confirmed") &&
+                r.FullBackupFile == @"C:\Backups\full.bak")),
+            Times.Once);
     }
 
     [Fact]
@@ -161,7 +179,8 @@ public class RestoreOrchestratorServiceTests
             h => h.SaveAsync(It.Is<RestoreHistoryRecord>(r =>
                 r.DatabaseName == "TestDB" &&
                 !r.Success &&
-                r.ErrorMessage == "SQL timeout")),
+                r.ErrorMessage != null &&
+                r.ErrorMessage.Contains("Restore execution failed: SQL timeout"))),
             Times.Once);
     }
 
@@ -251,6 +270,38 @@ public class RestoreOrchestratorServiceTests
 
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*RestoreOrchestrator:DatabaseName must be configured*");
+
+        _historyRepositoryMock.Verify(
+            h => h.SaveAsync(It.IsAny<RestoreHistoryRecord>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task ExecuteRestore_WhenPlannerFails_SavesFailureHistoryWithMinimalPlanInfo()
+    {
+        var targetTime = DateTime.UtcNow;
+
+        _plannerMock
+            .Setup(p => p.BuildRestorePlanAsync("TestDB", targetTime))
+            .ThrowsAsync(new InvalidOperationException("Planner source unavailable"));
+
+        var sut = CreateSut();
+
+        Func<Task> act = async () => await sut.ExecuteRestore(targetTime);
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*Planner source unavailable*");
+
+        _historyRepositoryMock.Verify(
+            h => h.SaveAsync(It.Is<RestoreHistoryRecord>(r =>
+                r.DatabaseName == "TestDB" &&
+                r.TargetRestoreTime == targetTime &&
+                r.FullBackupFile == string.Empty &&
+                r.DiffBackupFile == null &&
+                r.LogBackupFiles.Count == 0 &&
+                !r.Success &&
+                r.ErrorMessage == "Planner source unavailable")),
+            Times.Once);
     }
 
     private RestoreOrchestratorService CreateSut()
