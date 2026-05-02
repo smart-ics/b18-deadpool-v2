@@ -25,6 +25,7 @@ public sealed class RestoreViewModel : INotifyPropertyChanged
     private RestoreValidationResult _validation = new();
     private bool _isValid;
     private bool _isConfirmed;
+    private bool _requireTextMatch;
     private string _confirmationText = string.Empty;
     private string _statusMessage = "Select target restore time and generate plan.";
     private DateTime? _targetDate;
@@ -50,6 +51,8 @@ public sealed class RestoreViewModel : INotifyPropertyChanged
         DatabaseName = options.Value.DatabaseName;
         if (string.IsNullOrWhiteSpace(DatabaseName))
             DatabaseName = "UNKNOWN";
+
+        _requireTextMatch = options.Value.RequireTextMatch;
 
         var now = DateTime.Now;
         _targetDate = now.Date;
@@ -144,6 +147,18 @@ public sealed class RestoreViewModel : INotifyPropertyChanged
         }
     }
 
+    public bool RequireTextMatch
+    {
+        get => _requireTextMatch;
+        set
+        {
+            if (SetField(ref _requireTextMatch, value))
+            {
+                RaiseCommandStates();
+            }
+        }
+    }
+
     public string ConfirmationText
     {
         get => _confirmationText;
@@ -222,7 +237,7 @@ public sealed class RestoreViewModel : INotifyPropertyChanged
                 DatabaseName = DatabaseName,
                 Confirmed = IsConfirmed,
                 ConfirmationText = ConfirmationText,
-                RequireTextMatch = true
+                RequireTextMatch = RequireTextMatch
             };
 
             _safetyGuard.EnsureConfirmed(context);
@@ -250,6 +265,9 @@ public sealed class RestoreViewModel : INotifyPropertyChanged
         if (!IsConfirmed)
             return false;
 
+        if (!RequireTextMatch)
+            return true;
+
         return string.Equals(ConfirmationText, DatabaseName, StringComparison.Ordinal);
     }
 
@@ -269,21 +287,38 @@ public sealed class RestoreViewModel : INotifyPropertyChanged
     private RestorePlanViewModel BuildPlanViewModel(RestorePlan plan)
     {
         var steps = new List<RestoreStepViewModel>();
+        var hasLogs = plan.LogBackups.Count > 0;
+        var stopAtAssigned = false;
 
         if (plan.FullBackup != null)
         {
-            steps.Add(ToStep(plan.FullBackup, isStopAt: false));
+            var fullIsStopAt = !hasLogs && plan.DifferentialBackup == null;
+            steps.Add(ToStep(plan.FullBackup, isStopAt: fullIsStopAt));
+            stopAtAssigned = fullIsStopAt;
         }
 
         if (plan.DifferentialBackup != null)
         {
-            steps.Add(ToStep(plan.DifferentialBackup, isStopAt: false));
+            var diffIsStopAt = !hasLogs;
+            steps.Add(ToStep(plan.DifferentialBackup, isStopAt: diffIsStopAt));
+            stopAtAssigned = stopAtAssigned || diffIsStopAt;
         }
 
         for (var i = 0; i < plan.LogBackups.Count; i++)
         {
             var isLast = i == plan.LogBackups.Count - 1;
             steps.Add(ToStep(plan.LogBackups[i], isStopAt: isLast));
+            if (isLast)
+            {
+                stopAtAssigned = true;
+            }
+        }
+
+        // Defensive fallback: ensure STOPAT is always visible on at least one step.
+        if (!stopAtAssigned && steps.Count > 0)
+        {
+            var last = steps[^1];
+            steps[^1] = new RestoreStepViewModel(last.Type, last.FileName, last.CompletedAt, isStopAt: true);
         }
 
         return new RestorePlanViewModel(steps, plan.RequestedRestorePoint);

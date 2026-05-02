@@ -189,9 +189,10 @@
 
                 <TextBlock Margin="0,8,0,4"
                            Foreground="{StaticResource MutedTextBrush}"
-                           Text="Type database name to confirm:" />
+                                                     Text="Type database name to confirm (required only when strict text-match is enabled):" />
 
                 <TextBox Text="{Binding ConfirmationText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                 IsEnabled="{Binding RequireTextMatch}"
                          MaxLength="256" />
             </StackPanel>
         </Border>
