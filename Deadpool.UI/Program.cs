@@ -149,6 +149,7 @@ static class Program
         services.AddScoped<IRestorePlannerService, RestorePlannerService>();
         services.AddScoped<IRestorePlanValidatorService, RestorePlanValidatorService>();
         services.AddScoped<IRestoreScriptBuilderService, RestoreScriptBuilderService>();
+        services.AddScoped<IRestoreSafetyGuard, RestoreSafetyGuardService>();
         services.AddScoped<IRestoreExecutionService, RestoreExecutionService>();
         services.AddScoped<IRestoreOrchestratorService, RestoreOrchestratorService>();
     }

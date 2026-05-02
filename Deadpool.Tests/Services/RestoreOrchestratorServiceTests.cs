@@ -15,6 +15,7 @@ public class RestoreOrchestratorServiceTests
 {
     private readonly Mock<IRestorePlannerService> _plannerMock = new();
     private readonly Mock<IRestorePlanValidatorService> _validatorMock = new();
+    private readonly Mock<IRestoreSafetyGuard> _safetyGuardMock = new();
     private readonly Mock<IRestoreExecutionService> _executorMock = new();
 
     [Fact]
@@ -45,6 +46,10 @@ public class RestoreOrchestratorServiceTests
         _executorMock.Verify(
             e => e.ExecuteAsync(It.IsAny<RestorePlan>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()),
             Times.Never);
+
+        _safetyGuardMock.Verify(
+            s => s.EnsureConfirmed(It.IsAny<RestoreConfirmationContext>()),
+            Times.Never);
     }
 
     [Fact]
@@ -74,12 +79,48 @@ public class RestoreOrchestratorServiceTests
 
         _plannerMock.Verify(p => p.BuildRestorePlanAsync("TestDB", targetTime), Times.Once);
         _validatorMock.Verify(v => v.Validate(plan), Times.Once);
+        _safetyGuardMock.Verify(
+            s => s.EnsureConfirmed(It.Is<RestoreConfirmationContext>(c =>
+                c.DatabaseName == "TestDB" &&
+                c.Confirmed &&
+                !c.RequireTextMatch)),
+            Times.Once);
         _executorMock.Verify(
             e => e.ExecuteAsync(
                 plan,
                 true,
                 It.IsAny<CancellationToken>()),
             Times.Once);
+    }
+
+    [Fact]
+    public async Task ExecuteRestore_WhenSafetyGuardBlocks_StopsBeforeExecutor()
+    {
+        var targetTime = DateTime.UtcNow;
+        var plan = BuildValidPlan(targetTime);
+
+        _plannerMock
+            .Setup(p => p.BuildRestorePlanAsync("TestDB", targetTime))
+            .ReturnsAsync(plan);
+
+        _validatorMock
+            .Setup(v => v.Validate(plan))
+            .Returns(new RestoreValidationResult());
+
+        _safetyGuardMock
+            .Setup(s => s.EnsureConfirmed(It.IsAny<RestoreConfirmationContext>()))
+            .Throws(new InvalidOperationException("Restore not confirmed. This operation will overwrite database 'TestDB'."));
+
+        var sut = CreateSut();
+
+        Func<Task> act = async () => await sut.ExecuteRestore(targetTime);
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*Restore not confirmed*overwrite database 'TestDB'*");
+
+        _executorMock.Verify(
+            e => e.ExecuteAsync(It.IsAny<RestorePlan>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     [Fact]
@@ -116,6 +157,7 @@ public class RestoreOrchestratorServiceTests
         var sut = new RestoreOrchestratorService(
             _plannerMock.Object,
             _validatorMock.Object,
+            _safetyGuardMock.Object,
             _executorMock.Object,
             options,
             NullLogger<RestoreOrchestratorService>.Instance);
@@ -131,12 +173,15 @@ public class RestoreOrchestratorServiceTests
         var options = new RestoreOrchestratorOptions
         {
             DatabaseName = "TestDB",
-            AllowOverwrite = true
+            AllowOverwrite = true,
+            Confirmed = true,
+            RequireTextMatch = false
         };
 
         return new RestoreOrchestratorService(
             _plannerMock.Object,
             _validatorMock.Object,
+            _safetyGuardMock.Object,
             _executorMock.Object,
             Options.Create(options),
             NullLogger<RestoreOrchestratorService>.Instance);

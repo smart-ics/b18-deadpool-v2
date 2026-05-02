@@ -1,12 +1,11 @@
-namespace Deadpool.Core.Configuration;
+namespace Deadpool.Core.Domain.ValueObjects;
 
 /// <summary>
-/// Runtime settings used by restore orchestration entry point.
+/// Operator confirmation input required before executing a destructive restore.
 /// </summary>
-public sealed class RestoreOrchestratorOptions
+public sealed class RestoreConfirmationContext
 {
     public string DatabaseName { get; set; } = string.Empty;
-    public bool AllowOverwrite { get; set; }
     public bool Confirmed { get; set; }
     public string? ConfirmationText { get; set; }
     public bool RequireTextMatch { get; set; }

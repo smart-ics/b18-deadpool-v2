@@ -216,6 +216,7 @@ builder.Services.AddSingleton<IBackupChainInitializationService, BackupChainInit
 builder.Services.AddScoped<IRestorePlannerService, RestorePlannerService>();
 builder.Services.AddScoped<IRestorePlanValidatorService, RestorePlanValidatorService>();
 builder.Services.AddScoped<IRestoreScriptBuilderService, RestoreScriptBuilderService>();
+builder.Services.AddScoped<IRestoreSafetyGuard, RestoreSafetyGuardService>();
 builder.Services.AddScoped<IRestoreExecutionService, RestoreExecutionService>();
 builder.Services.AddScoped<IRestoreOrchestratorService, RestoreOrchestratorService>();
 

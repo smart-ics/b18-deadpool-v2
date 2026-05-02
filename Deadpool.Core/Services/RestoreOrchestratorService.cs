@@ -1,4 +1,5 @@
 using Deadpool.Core.Configuration;
+using Deadpool.Core.Domain.ValueObjects;
 using Deadpool.Core.Interfaces;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -13,6 +14,7 @@ public sealed class RestoreOrchestratorService : IRestoreOrchestratorService
 {
     private readonly IRestorePlannerService _planner;
     private readonly IRestorePlanValidatorService _validator;
+    private readonly IRestoreSafetyGuard _safetyGuard;
     private readonly IRestoreExecutionService _executor;
     private readonly IOptions<RestoreOrchestratorOptions> _orchestratorOptions;
     private readonly ILogger<RestoreOrchestratorService> _logger;
@@ -20,12 +22,14 @@ public sealed class RestoreOrchestratorService : IRestoreOrchestratorService
     public RestoreOrchestratorService(
         IRestorePlannerService planner,
         IRestorePlanValidatorService validator,
+        IRestoreSafetyGuard safetyGuard,
         IRestoreExecutionService executor,
         IOptions<RestoreOrchestratorOptions> orchestratorOptions,
         ILogger<RestoreOrchestratorService> logger)
     {
         _planner = planner ?? throw new ArgumentNullException(nameof(planner));
         _validator = validator ?? throw new ArgumentNullException(nameof(validator));
+        _safetyGuard = safetyGuard ?? throw new ArgumentNullException(nameof(safetyGuard));
         _executor = executor ?? throw new ArgumentNullException(nameof(executor));
         _orchestratorOptions = orchestratorOptions ?? throw new ArgumentNullException(nameof(orchestratorOptions));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -44,6 +48,16 @@ public sealed class RestoreOrchestratorService : IRestoreOrchestratorService
             _logger.LogError("Restore orchestration blocked by validation. Errors: {Errors}", validation.Errors);
             throw new InvalidOperationException(message);
         }
+
+        var confirmation = new RestoreConfirmationContext
+        {
+            DatabaseName = plan.DatabaseName,
+            Confirmed = _orchestratorOptions.Value.Confirmed,
+            ConfirmationText = _orchestratorOptions.Value.ConfirmationText,
+            RequireTextMatch = _orchestratorOptions.Value.RequireTextMatch
+        };
+
+        _safetyGuard.EnsureConfirmed(confirmation);
 
         var executionResult = await _executor.ExecuteAsync(
             plan,
