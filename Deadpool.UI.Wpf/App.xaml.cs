@@ -119,6 +119,7 @@ public partial class App : Application
 		services.AddSingleton<IDashboardMonitoringService, DashboardMonitoringService>();
 		services.AddScoped<IRestorePlannerService, RestorePlannerService>();
 		services.AddScoped<IRestorePlanValidatorService, RestorePlanValidatorService>();
+		services.AddScoped<IRestoreScriptBuilderService, RestoreScriptBuilderService>();
 		services.AddScoped<IRestoreExecutionService, RestoreExecutionService>();
 		services.AddScoped<IRestoreOrchestratorService, RestoreOrchestratorService>();
 		services.AddSingleton<MainWindow>();

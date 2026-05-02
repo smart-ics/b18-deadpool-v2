@@ -208,6 +208,7 @@ builder.Services.AddSingleton<IBootstrapStateTracker, InMemoryBootstrapStateTrac
 builder.Services.AddSingleton<IBackupChainInitializationService, BackupChainInitializationService>();
 builder.Services.AddScoped<IRestorePlannerService, RestorePlannerService>();
 builder.Services.AddScoped<IRestorePlanValidatorService, RestorePlanValidatorService>();
+builder.Services.AddScoped<IRestoreScriptBuilderService, RestoreScriptBuilderService>();
 builder.Services.AddScoped<IRestoreExecutionService, RestoreExecutionService>();
 builder.Services.AddScoped<IRestoreOrchestratorService, RestoreOrchestratorService>();
 
