@@ -1,5 +1,6 @@
 using Deadpool.Core.Interfaces;
 using Deadpool.Core.Services;
+using Deadpool.Core.Configuration;
 using Deadpool.Infrastructure.Persistence;
 using Deadpool.UI.Wpf.ViewModels;
 using Microsoft.Extensions.Configuration;
@@ -64,6 +65,14 @@ public partial class App : Application
 	private static void ConfigureServices(IServiceCollection services, IConfiguration configuration)
 	{
 		services.AddSingleton(configuration);
+		var firstDatabaseName = configuration
+			.GetSection("BackupPolicies")
+			.GetChildren()
+			.FirstOrDefault()?["DatabaseName"];
+		services.Configure<RestoreOrchestratorOptions>(options =>
+		{
+			options.DatabaseName = firstDatabaseName ?? string.Empty;
+		});
 
 		services.AddLogging(builder =>
 		{
@@ -108,8 +117,10 @@ public partial class App : Application
 		});
 
 		services.AddSingleton<IDashboardMonitoringService, DashboardMonitoringService>();
+		services.AddScoped<IRestorePlannerService, RestorePlannerService>();
 		services.AddScoped<IRestorePlanValidatorService, RestorePlanValidatorService>();
 		services.AddScoped<IRestoreExecutionService, RestoreExecutionService>();
+		services.AddScoped<IRestoreOrchestratorService, RestoreOrchestratorService>();
 		services.AddSingleton<MainWindow>();
 
 		services.AddSingleton<DashboardViewModel>(sp =>

@@ -81,6 +81,14 @@ static class Program
     {
         // Configuration options
         services.Configure<DashboardOptions>(configuration.GetSection("Dashboard"));
+        services.Configure<List<DatabaseBackupPolicyOptions>>(configuration.GetSection("BackupPolicies"));
+
+        var backupPolicies = configuration.GetSection("BackupPolicies").Get<List<DatabaseBackupPolicyOptions>>()
+            ?? new List<DatabaseBackupPolicyOptions>();
+        services.Configure<RestoreOrchestratorOptions>(options =>
+        {
+            options.DatabaseName = backupPolicies.FirstOrDefault()?.DatabaseName ?? string.Empty;
+        });
 
         // Logging (simple debug logging for UI)
         services.AddLogging(builder =>
@@ -131,8 +139,10 @@ static class Program
         services.AddSingleton<IBackupJobMonitoringService, BackupJobMonitoringService>();
         services.AddSingleton<ICronScheduleDescriptionService, CronScheduleDescriptionService>();
         services.AddSingleton<IBackupPolicyDisplayFormatter, BackupPolicyDisplayFormatter>();
+        services.AddScoped<IRestorePlannerService, RestorePlannerService>();
         services.AddScoped<IRestorePlanValidatorService, RestorePlanValidatorService>();
         services.AddScoped<IRestoreExecutionService, RestoreExecutionService>();
+        services.AddScoped<IRestoreOrchestratorService, RestoreOrchestratorService>();
     }
 
 }

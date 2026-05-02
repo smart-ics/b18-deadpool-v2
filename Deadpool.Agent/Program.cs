@@ -41,6 +41,16 @@ builder.Configuration.AddConfiguration(configuration);
 builder.Services.Configure<List<DatabaseBackupPolicyOptions>>(
     builder.Configuration.GetSection("BackupPolicies"));
 
+var startupPolicies = builder.Configuration
+    .GetSection("BackupPolicies")
+    .Get<List<DatabaseBackupPolicyOptions>>()
+    ?? new List<DatabaseBackupPolicyOptions>();
+
+builder.Services.Configure<RestoreOrchestratorOptions>(options =>
+{
+    options.DatabaseName = startupPolicies.FirstOrDefault()?.DatabaseName ?? string.Empty;
+});
+
 // Execution worker configuration
 builder.Services.Configure<ExecutionWorkerOptions>(
     builder.Configuration.GetSection("ExecutionWorker"));
@@ -196,8 +206,10 @@ builder.Services.AddSingleton<BackupService>();
 // Bootstrap state tracker and initialization service
 builder.Services.AddSingleton<IBootstrapStateTracker, InMemoryBootstrapStateTracker>();
 builder.Services.AddSingleton<IBackupChainInitializationService, BackupChainInitializationService>();
+builder.Services.AddScoped<IRestorePlannerService, RestorePlannerService>();
 builder.Services.AddScoped<IRestorePlanValidatorService, RestorePlanValidatorService>();
 builder.Services.AddScoped<IRestoreExecutionService, RestoreExecutionService>();
+builder.Services.AddScoped<IRestoreOrchestratorService, RestoreOrchestratorService>();
 
 // Hosted workers.
 // Safety note: all BackgroundService.ExecuteAsync methods start concurrently —
@@ -220,4 +232,23 @@ var startupLogger = host.Services.GetRequiredService<ILoggerFactory>().CreateLog
 ProductionSqlRuntimeFactory.LogConnectivityCheckAsync(productionConnectionString, startupLogger)
     .GetAwaiter()
     .GetResult();
+
+// Temporary runtime restore command path.
+// When enabled via configuration, this invokes the real orchestration flow:
+// Planner -> Validator -> Execution guard.
+var runRestoreOnStartup = builder.Configuration.GetValue<bool>("Restore:StartupCommand:Enabled");
+if (runRestoreOnStartup)
+{
+    var targetTimeText = builder.Configuration["Restore:StartupCommand:TargetTimeUtc"];
+    if (!DateTime.TryParse(targetTimeText, null, System.Globalization.DateTimeStyles.AdjustToUniversal, out var targetTime))
+    {
+        throw new InvalidOperationException(
+            "Restore:StartupCommand:TargetTimeUtc must be a valid UTC DateTime when Restore:StartupCommand:Enabled is true.");
+    }
+
+    using var scope = host.Services.CreateScope();
+    var orchestrator = scope.ServiceProvider.GetRequiredService<IRestoreOrchestratorService>();
+    orchestrator.ExecuteRestore(targetTime).GetAwaiter().GetResult();
+}
+
 host.Run();

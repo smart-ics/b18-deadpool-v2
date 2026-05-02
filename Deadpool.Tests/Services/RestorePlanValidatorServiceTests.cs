@@ -62,6 +62,7 @@ public class RestorePlanValidatorServiceTests
         var result = _service.Validate(plan);
 
         result.IsValid.Should().BeFalse();
+        result.Errors.Should().NotBeEmpty();
         result.Errors.Should().Contain(e => e.Contains("missing or pending placeholder", StringComparison.OrdinalIgnoreCase));
     }
 
@@ -87,6 +88,7 @@ public class RestorePlanValidatorServiceTests
             var result = _service.Validate(plan);
 
             result.IsValid.Should().BeFalse();
+            result.Errors.Should().NotBeEmpty();
             result.Errors.Should().Contain(e => e.Contains("inaccessible or locked", StringComparison.OrdinalIgnoreCase));
         }
         finally
@@ -118,6 +120,7 @@ public class RestorePlanValidatorServiceTests
             var result = _service.Validate(plan);
 
             result.IsValid.Should().BeFalse();
+            result.Errors.Should().NotBeEmpty();
             result.Errors.Should().Contain(e => e.Contains("LSN mismatch", StringComparison.OrdinalIgnoreCase));
         }
         finally
@@ -150,6 +153,7 @@ public class RestorePlanValidatorServiceTests
             var result = _service.Validate(plan);
 
             result.IsValid.Should().BeFalse();
+            result.Errors.Should().NotBeEmpty();
             result.Errors.Should().Contain(e => e.Contains("beyond available log backup coverage", StringComparison.OrdinalIgnoreCase));
         }
         finally
@@ -240,6 +244,7 @@ public class RestorePlanValidatorServiceTests
             var result = _service.Validate(plan);
 
             result.IsValid.Should().BeTrue();
+            result.Errors.Should().BeEmpty();
         }
         finally
         {
@@ -270,6 +275,7 @@ public class RestorePlanValidatorServiceTests
             var result = _service.Validate(plan);
 
             result.IsValid.Should().BeTrue();
+            result.Errors.Should().BeEmpty();
         }
         finally
         {
@@ -300,6 +306,7 @@ public class RestorePlanValidatorServiceTests
             var result = _service.Validate(plan);
 
             result.IsValid.Should().BeTrue();
+            result.Errors.Should().BeEmpty();
         }
         finally
         {
@@ -328,6 +335,7 @@ public class RestorePlanValidatorServiceTests
             var result = _service.Validate(plan);
 
             result.IsValid.Should().BeFalse();
+            result.Errors.Should().NotBeEmpty();
             result.Errors.Should().Contain(e => e.Contains("missing or pending placeholder", StringComparison.OrdinalIgnoreCase));
         }
         finally
@@ -352,6 +360,7 @@ public class RestorePlanValidatorServiceTests
         var result = _service.Validate(plan);
 
         result.IsValid.Should().BeFalse();
+        result.Errors.Should().NotBeEmpty();
         result.Errors.Should().Contain(e => e.Contains("missing or pending placeholder", StringComparison.OrdinalIgnoreCase));
     }
 
@@ -381,6 +390,7 @@ public class RestorePlanValidatorServiceTests
             var result = _service.Validate(plan);
 
             result.IsValid.Should().BeFalse();
+            result.Errors.Should().NotBeEmpty();
             result.Errors.Should().Contain(e => e.Contains("Broken transaction log chain", StringComparison.OrdinalIgnoreCase));
         }
         finally
@@ -416,6 +426,7 @@ public class RestorePlanValidatorServiceTests
             var second = _service.Validate(plan);
 
             first.IsValid.Should().BeFalse();
+            first.Errors.Should().NotBeEmpty();
             first.Errors.Should().Contain(e => e.Contains("chronological order", StringComparison.OrdinalIgnoreCase));
             second.IsValid.Should().Be(first.IsValid);
             second.Errors.Should().BeEquivalentTo(first.Errors);
