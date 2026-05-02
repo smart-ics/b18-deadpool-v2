@@ -35,9 +35,36 @@ public sealed class StubBackupExecutor : IBackupExecutor
 
     public Task<BackupLSNMetadata?> GetBackupLSNMetadataAsync(string databaseName, string backupFilePath)
     {
-        // Stub implementation: Return null LSN metadata
-        // Conservative: Retention cleanup will retain more backups when LSN metadata is missing
-        return Task.FromResult<BackupLSNMetadata?>(null);
+        ValidateParameters(databaseName, backupFilePath);
+
+        if (backupFilePath.Contains("_FULL_", StringComparison.OrdinalIgnoreCase))
+        {
+            return Task.FromResult<BackupLSNMetadata?>(new BackupLSNMetadata(
+                firstLSN: null,
+                lastLSN: null,
+                databaseBackupLSN: 1000m,
+                checkpointLSN: 1000m));
+        }
+
+        if (backupFilePath.Contains("_DIFF_", StringComparison.OrdinalIgnoreCase))
+        {
+            return Task.FromResult<BackupLSNMetadata?>(new BackupLSNMetadata(
+                firstLSN: null,
+                lastLSN: null,
+                databaseBackupLSN: 1000m,
+                checkpointLSN: null));
+        }
+
+        if (backupFilePath.Contains("_LOG_", StringComparison.OrdinalIgnoreCase))
+        {
+            return Task.FromResult<BackupLSNMetadata?>(new BackupLSNMetadata(
+                firstLSN: 2000m,
+                lastLSN: 3000m,
+                databaseBackupLSN: 1000m,
+                checkpointLSN: null));
+        }
+
+        throw new InvalidOperationException($"Cannot infer backup type from path: {backupFilePath}");
     }
 
     private static void ValidateParameters(string databaseName, string backupFilePath)

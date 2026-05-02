@@ -52,6 +52,15 @@ public class BackupExecutionWorkerTests
             diffJob.Status.Should().Be(BackupStatus.Completed);
             logJob.Status.Should().Be(BackupStatus.Completed);
 
+            fullJob.DatabaseBackupLSN.Should().NotBeNull();
+            fullJob.CheckpointLSN.Should().NotBeNull();
+
+            diffJob.DatabaseBackupLSN.Should().NotBeNull();
+
+            logJob.FirstLSN.Should().NotBeNull();
+            logJob.LastLSN.Should().NotBeNull();
+            logJob.DatabaseBackupLSN.Should().NotBeNull();
+
             fullJob.BackupFilePath.Should().NotStartWith("PENDING_");
             diffJob.BackupFilePath.Should().NotStartWith("PENDING_");
             logJob.BackupFilePath.Should().NotStartWith("PENDING_");
@@ -72,6 +81,47 @@ public class BackupExecutionWorkerTests
 
             repository.GetStatusHistory(logJob)
                 .Should().ContainInOrder(BackupStatus.Running, BackupStatus.Completed);
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+            {
+                Directory.Delete(tempRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Executor_ShouldFailJob_WhenRequiredLsnMetadataIsMissing()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), $"deadpool-worker-tests-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempRoot);
+
+        try
+        {
+            var repository = new ClaimOnlyInMemoryBackupJobRepository();
+            var backupExecutor = new MissingMetadataBackupExecutor();
+            var metadataService = new StubMetadataService();
+            var filePathService = new BackupFilePathService(tempRoot);
+
+            var worker = new BackupExecutionWorker(
+                NullLogger<BackupExecutionWorker>.Instance,
+                repository,
+                backupExecutor,
+                filePathService,
+                metadataService);
+
+            var fullJob = new BackupJob("TestDB", BackupType.Full, Path.Combine(tempRoot, "full-placeholder.bak"));
+            await repository.CreateAsync(fullJob);
+
+            var cts = new CancellationTokenSource();
+            var workerTask = worker.StartAsync(cts.Token);
+            await Task.Delay(800);
+            await cts.CancelAsync();
+            await workerTask;
+
+            fullJob.Status.Should().Be(BackupStatus.Failed);
+            fullJob.ErrorMessage.Should().Contain("DatabaseBackupLSN");
         }
         finally
         {
@@ -219,9 +269,38 @@ public class BackupExecutionWorkerTests
             => Task.FromResult(File.Exists(backupFilePath));
 
         public Task<BackupLSNMetadata?> GetBackupLSNMetadataAsync(string databaseName, string backupFilePath)
-            => Task.FromResult<BackupLSNMetadata?>(null);
+        {
+            if (backupFilePath.Contains("_FULL_", StringComparison.OrdinalIgnoreCase))
+            {
+                return Task.FromResult<BackupLSNMetadata?>(new BackupLSNMetadata(
+                    firstLSN: null,
+                    lastLSN: null,
+                    databaseBackupLSN: 1000m,
+                    checkpointLSN: 1000m));
+            }
 
-        private static Task WriteFileAsync(string backupFilePath)
+            if (backupFilePath.Contains("_DIFF_", StringComparison.OrdinalIgnoreCase))
+            {
+                return Task.FromResult<BackupLSNMetadata?>(new BackupLSNMetadata(
+                    firstLSN: null,
+                    lastLSN: null,
+                    databaseBackupLSN: 1000m,
+                    checkpointLSN: null));
+            }
+
+            if (backupFilePath.Contains("_LOG_", StringComparison.OrdinalIgnoreCase))
+            {
+                return Task.FromResult<BackupLSNMetadata?>(new BackupLSNMetadata(
+                    firstLSN: 2000m,
+                    lastLSN: 3000m,
+                    databaseBackupLSN: 1000m,
+                    checkpointLSN: null));
+            }
+
+            return Task.FromResult<BackupLSNMetadata?>(null);
+        }
+
+        public static Task WriteFileForTestAsync(string backupFilePath)
         {
             var directory = Path.GetDirectoryName(backupFilePath);
             if (!string.IsNullOrWhiteSpace(directory) && !Directory.Exists(directory))
@@ -232,11 +311,36 @@ public class BackupExecutionWorkerTests
             File.WriteAllText(backupFilePath, "BACKUP");
             return Task.CompletedTask;
         }
+
+        private static Task WriteFileAsync(string backupFilePath)
+            => WriteFileForTestAsync(backupFilePath);
     }
 
     private sealed class StubMetadataService : IDatabaseMetadataService
     {
         public Task<RecoveryModel> GetRecoveryModelAsync(string databaseName)
             => Task.FromResult(RecoveryModel.Full);
+    }
+
+    private sealed class MissingMetadataBackupExecutor : IBackupExecutor
+    {
+        public Task ExecuteFullBackupAsync(string databaseName, string backupFilePath)
+            => StubFileBackupExecutor.WriteFileForTestAsync(backupFilePath);
+
+        public Task ExecuteDifferentialBackupAsync(string databaseName, string backupFilePath)
+            => StubFileBackupExecutor.WriteFileForTestAsync(backupFilePath);
+
+        public Task ExecuteTransactionLogBackupAsync(string databaseName, string backupFilePath)
+            => StubFileBackupExecutor.WriteFileForTestAsync(backupFilePath);
+
+        public Task<bool> VerifyBackupFileAsync(string backupFilePath)
+            => Task.FromResult(File.Exists(backupFilePath));
+
+        public Task<BackupLSNMetadata?> GetBackupLSNMetadataAsync(string databaseName, string backupFilePath)
+            => Task.FromResult<BackupLSNMetadata?>(new BackupLSNMetadata(
+                firstLSN: null,
+                lastLSN: null,
+                databaseBackupLSN: null,
+                checkpointLSN: null));
     }
 }

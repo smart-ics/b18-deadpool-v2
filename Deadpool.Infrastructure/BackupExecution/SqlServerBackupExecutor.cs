@@ -193,53 +193,36 @@ public class SqlServerBackupExecutor : IBackupExecutor
         if (string.IsNullOrWhiteSpace(backupFilePath))
             throw new ArgumentException("Backup file path cannot be empty.", nameof(backupFilePath));
 
-        try
-        {
-            await using var connection = new SqlConnection(_connectionString);
-            await connection.OpenAsync();
+        await using var connection = new SqlConnection(_connectionString);
+        await connection.OpenAsync();
 
-            // Query msdb.dbo.backupset for LSN metadata
-            // Match by database name and physical_device_name from backupmediafamily
-            // Order by backup_finish_date to get the most recent backup for this file
-            var sql = @"
-                SELECT TOP 1
-                    bs.first_lsn,
-                    bs.last_lsn,
-                    bs.database_backup_lsn,
-                    bs.checkpoint_lsn
-                FROM msdb.dbo.backupset bs
-                INNER JOIN msdb.dbo.backupmediafamily bmf ON bs.media_set_id = bmf.media_set_id
-                WHERE bs.database_name = @DatabaseName
-                  AND bmf.physical_device_name = @BackupFilePath
-                ORDER BY bs.backup_finish_date DESC";
+        // Read metadata directly from the backup file that was just produced.
+        // This avoids race conditions and dependency on msdb history visibility.
+        var headerOnlySql = @"
+            RESTORE HEADERONLY
+            FROM DISK = @BackupFilePath";
 
-            var result = await connection.QuerySingleOrDefaultAsync<BackupLSNMetadataDto>(
-                sql,
-                new { DatabaseName = databaseName, BackupFilePath = backupFilePath },
-                commandTimeout: 30);
+        var header = await connection.QuerySingleOrDefaultAsync<BackupHeaderOnlyDto>(
+            headerOnlySql,
+            new { BackupFilePath = backupFilePath },
+            commandTimeout: 120);
 
-            if (result == null)
-                return null;
+        if (header == null)
+            throw new InvalidOperationException(
+                $"RESTORE HEADERONLY returned no rows for backup file '{backupFilePath}'.");
 
-            return new BackupLSNMetadata(
-                result.first_lsn,
-                result.last_lsn,
-                result.database_backup_lsn,
-                result.checkpoint_lsn);
-        }
-        catch
-        {
-            // LSN metadata capture failure is non-fatal
-            // Conservative: Return null to signal uncertainty
-            return null;
-        }
+        return new BackupLSNMetadata(
+            header.FirstLSN,
+            header.LastLSN,
+            header.DatabaseBackupLSN,
+            header.CheckpointLSN);
     }
 
-    private class BackupLSNMetadataDto
+    private sealed class BackupHeaderOnlyDto
     {
-        public decimal? first_lsn { get; set; }
-        public decimal? last_lsn { get; set; }
-        public decimal? database_backup_lsn { get; set; }
-        public decimal? checkpoint_lsn { get; set; }
+        public decimal? FirstLSN { get; set; }
+        public decimal? LastLSN { get; set; }
+        public decimal? DatabaseBackupLSN { get; set; }
+        public decimal? CheckpointLSN { get; set; }
     }
 }

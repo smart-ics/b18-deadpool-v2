@@ -1,5 +1,6 @@
 using Deadpool.Core.Domain.Entities;
 using Deadpool.Core.Domain.Enums;
+using Deadpool.Core.Domain.ValueObjects;
 using Deadpool.Core.Interfaces;
 using Deadpool.Core.Services;
 
@@ -117,6 +118,13 @@ public sealed class BackupExecutionWorker : BackgroundService
 
             _logger.LogInformation("Backup file created: {Path}", actualBackupFilePath);
 
+            // Extract required LSN metadata from backup header before completion.
+            var lsnMetadata = await _backupExecutor.GetBackupLSNMetadataAsync(job.DatabaseName, actualBackupFilePath)
+                ?? throw new InvalidOperationException(
+                    $"LSN metadata extraction returned no data for '{job.DatabaseName}' ({job.BackupType}).");
+
+            var mappedLsn = MapAndValidateRequiredLsn(job.BackupType, lsnMetadata);
+
             // Verify backup before marking completion
             var isVerified = await _backupExecutor.VerifyBackupFileAsync(actualBackupFilePath);
             if (!isVerified)
@@ -130,6 +138,11 @@ public sealed class BackupExecutionWorker : BackgroundService
 
             var fileSize = GetBackupFileSize(actualBackupFilePath);
             job.MarkAsCompleted(actualBackupFilePath, fileSize);
+            job.SetLSNMetadata(
+                mappedLsn.FirstLSN,
+                mappedLsn.LastLSN,
+                mappedLsn.DatabaseBackupLSN,
+                mappedLsn.CheckpointLSN);
             await _jobRepository.UpdateAsync(job);
 
             _logger.LogInformation(
@@ -236,5 +249,40 @@ public sealed class BackupExecutionWorker : BackgroundService
     private static string BuildJobId(BackupJob job)
     {
         return $"{job.DatabaseName}:{job.BackupType}:{job.StartTime:O}";
+    }
+
+    private static BackupLSNMetadata MapAndValidateRequiredLsn(BackupType backupType, BackupLSNMetadata header)
+    {
+        return backupType switch
+        {
+            BackupType.Full => new BackupLSNMetadata(
+                firstLSN: null,
+                lastLSN: null,
+                databaseBackupLSN: RequireLsn(header.DatabaseBackupLSN, backupType, nameof(header.DatabaseBackupLSN)),
+                checkpointLSN: RequireLsn(header.CheckpointLSN, backupType, nameof(header.CheckpointLSN))),
+
+            BackupType.Differential => new BackupLSNMetadata(
+                firstLSN: null,
+                lastLSN: null,
+                databaseBackupLSN: RequireLsn(header.DatabaseBackupLSN, backupType, nameof(header.DatabaseBackupLSN)),
+                checkpointLSN: null),
+
+            BackupType.TransactionLog => new BackupLSNMetadata(
+                firstLSN: RequireLsn(header.FirstLSN, backupType, nameof(header.FirstLSN)),
+                lastLSN: RequireLsn(header.LastLSN, backupType, nameof(header.LastLSN)),
+                databaseBackupLSN: RequireLsn(header.DatabaseBackupLSN, backupType, nameof(header.DatabaseBackupLSN)),
+                checkpointLSN: null),
+
+            _ => throw new InvalidOperationException($"Unknown backup type: {backupType}")
+        };
+    }
+
+    private static decimal RequireLsn(decimal? value, BackupType backupType, string fieldName)
+    {
+        if (!value.HasValue)
+            throw new InvalidOperationException(
+                $"Backup metadata incomplete for {backupType}: missing required {fieldName}.");
+
+        return value.Value;
     }
 }
