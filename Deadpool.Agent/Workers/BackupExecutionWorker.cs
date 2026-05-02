@@ -124,6 +124,10 @@ public sealed class BackupExecutionWorker : BackgroundService
             // Validate prerequisites
             await ValidatePrerequisitesAsync(job.DatabaseName, job.BackupType);
 
+            // Capture true execution start right before SQL backup command execution.
+            job.MarkExecutionStarted();
+            await _jobRepository.UpdateAsync(job);
+
             // Execute backup directly
             await ExecuteBackupAsync(job.DatabaseName, job.BackupType, actualBackupFilePath);
 

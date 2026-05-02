@@ -26,7 +26,7 @@ public sealed class RestorePlannerService : IRestorePlannerService
         var completedBackups = (await _backupJobRepository.GetBackupsByDatabaseAsync(databaseName))
             .Where(b => b.Status == BackupStatus.Completed)
             .Where(b => b.EndTime.HasValue)
-            .OrderBy(b => b.StartTime)
+            .OrderBy(b => b.GetEffectiveStartTime())
             .ToList();
 
         var fullBackup = SelectFullBackup(completedBackups, targetTime);
@@ -107,7 +107,7 @@ public sealed class RestorePlannerService : IRestorePlannerService
         var candidateLogs = completedBackups
             .Where(b => b.BackupType == BackupType.TransactionLog)
             .Where(b => b.EndTime.HasValue && b.EndTime.Value > baseEndTime)
-            .OrderBy(b => b.StartTime)
+            .OrderBy(b => b.GetEffectiveStartTime())
             .ToList();
 
         if (!candidateLogs.Any())

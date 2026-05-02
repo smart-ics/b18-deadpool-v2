@@ -38,6 +38,7 @@ public class SqliteBackupJobRepository : IBackupJobRepository
                 BackupType INTEGER NOT NULL,
                 Status INTEGER NOT NULL,
                 StartTime TEXT NOT NULL,
+                ExecutionStartTime TEXT,
                 EndTime TEXT,
                 BackupFilePath TEXT NOT NULL,
                 FileSizeBytes INTEGER,
@@ -56,7 +57,25 @@ public class SqliteBackupJobRepository : IBackupJobRepository
         ";
 
         connection.Execute(createTableSql);
+        EnsureColumnExists(connection, "BackupJobs", "ExecutionStartTime", "TEXT");
         _logger.LogInformation("SQLite backup job database initialized at {ConnectionString}", _connectionString);
+    }
+
+    private static void EnsureColumnExists(SqliteConnection connection, string tableName, string columnName, string columnType)
+    {
+        var existingColumns = connection.Query<TableInfoRow>($"PRAGMA table_info({tableName});")
+            .Select(r => r.Name)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        if (existingColumns.Contains(columnName))
+            return;
+
+        connection.Execute($"ALTER TABLE {tableName} ADD COLUMN {columnName} {columnType};");
+    }
+
+    private sealed class TableInfoRow
+    {
+        public string Name { get; set; } = "";
     }
 
     public async Task CreateAsync(BackupJob backupJob)
@@ -68,11 +87,13 @@ public class SqliteBackupJobRepository : IBackupJobRepository
             INSERT INTO BackupJobs (
                 DatabaseName, BackupType, Status, StartTime, EndTime, 
                 BackupFilePath, FileSizeBytes, ErrorMessage,
-                FirstLSN, LastLSN, DatabaseBackupLSN, CheckpointLSN
+                FirstLSN, LastLSN, DatabaseBackupLSN, CheckpointLSN,
+                ExecutionStartTime
             ) VALUES (
                 @DatabaseName, @BackupType, @Status, @StartTime, @EndTime,
                 @BackupFilePath, @FileSizeBytes, @ErrorMessage,
-                @FirstLSN, @LastLSN, @DatabaseBackupLSN, @CheckpointLSN
+                @FirstLSN, @LastLSN, @DatabaseBackupLSN, @CheckpointLSN,
+                @ExecutionStartTime
             );
         ";
 
@@ -82,6 +103,7 @@ public class SqliteBackupJobRepository : IBackupJobRepository
             BackupType = (int)backupJob.BackupType,
             Status = (int)backupJob.Status,
             StartTime = backupJob.StartTime.ToString("O"),
+            ExecutionStartTime = backupJob.ExecutionStartTime?.ToString("O"),
             EndTime = backupJob.EndTime?.ToString("O"),
             backupJob.BackupFilePath,
             backupJob.FileSizeBytes,
@@ -101,6 +123,7 @@ public class SqliteBackupJobRepository : IBackupJobRepository
         var sql = @"
             UPDATE BackupJobs SET
                 Status = @Status,
+                ExecutionStartTime = @ExecutionStartTime,
                 EndTime = @EndTime,
                 BackupFilePath = @BackupFilePath,
                 FileSizeBytes = @FileSizeBytes,
@@ -120,6 +143,7 @@ public class SqliteBackupJobRepository : IBackupJobRepository
             BackupType = (int)backupJob.BackupType,
             StartTime = backupJob.StartTime.ToString("O"),
             Status = (int)backupJob.Status,
+            ExecutionStartTime = backupJob.ExecutionStartTime?.ToString("O"),
             EndTime = backupJob.EndTime?.ToString("O"),
             backupJob.BackupFilePath,
             backupJob.FileSizeBytes,
@@ -337,6 +361,9 @@ public class SqliteBackupJobRepository : IBackupJobRepository
         var endTime = string.IsNullOrWhiteSpace(row.EndTime)
             ? (DateTime?)null
             : DateTime.Parse(row.EndTime, null, System.Globalization.DateTimeStyles.RoundtripKind);
+        var executionStartTime = string.IsNullOrWhiteSpace(row.ExecutionStartTime)
+            ? (DateTime?)null
+            : DateTime.Parse(row.ExecutionStartTime, null, System.Globalization.DateTimeStyles.RoundtripKind);
 
         return BackupJob.Restore(
             row.DatabaseName,
@@ -350,7 +377,8 @@ public class SqliteBackupJobRepository : IBackupJobRepository
             row.FirstLSN,
             row.LastLSN,
             row.DatabaseBackupLSN,
-            row.CheckpointLSN);
+            row.CheckpointLSN,
+            executionStartTime);
     }
 
     private class BackupJobRow
@@ -360,6 +388,7 @@ public class SqliteBackupJobRepository : IBackupJobRepository
         public int BackupType { get; set; }
         public int Status { get; set; }
         public string StartTime { get; set; } = "";
+        public string? ExecutionStartTime { get; set; }
         public string? EndTime { get; set; }
         public string BackupFilePath { get; set; } = "";
         public long? FileSizeBytes { get; set; }

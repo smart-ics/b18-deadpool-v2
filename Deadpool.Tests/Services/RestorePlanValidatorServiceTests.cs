@@ -540,6 +540,7 @@ public class RestorePlanValidatorServiceTests
     private static BackupJob CreateCompletedLogBackup(string path, DateTime startTime, decimal firstLsn)
     {
         var endTime = startTime.AddMinutes(30);
+        var executionStartTime = startTime;
 
         return BackupJob.Restore(
             "TestDB",
@@ -553,6 +554,7 @@ public class RestorePlanValidatorServiceTests
             firstLsn,
             firstLsn + 50m,
             null,
-            null);
+            null,
+            executionStartTime);
     }
 }

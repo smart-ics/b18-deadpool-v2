@@ -192,9 +192,19 @@ public sealed class RestorePlanValidatorService : IRestorePlanValidatorService
                 continue;
             }
 
-            if (previousEndTime.HasValue && log.StartTime < previousEndTime.Value)
+            if (!log.ExecutionStartTime.HasValue)
             {
-                var message = $"Transaction log backup ordering is inconsistent at {log.StartTime:yyyy-MM-dd HH:mm:ss}.";
+                var message = $"Transaction log backup is missing ExecutionStartTime: {GetDisplayPath(log)}.";
+                result.AddError(message);
+                _logger.LogError("Chain inconsistency: {Message}", message);
+                previousEndTime = log.EndTime;
+                previousLog = log;
+                continue;
+            }
+
+            if (previousEndTime.HasValue && log.ExecutionStartTime.Value < previousEndTime.Value)
+            {
+                var message = $"Transaction log backup ordering is inconsistent at {log.ExecutionStartTime:yyyy-MM-dd HH:mm:ss}.";
                 result.AddError(message);
                 _logger.LogError("Chain inconsistency: {Message}", message);
             }
@@ -252,12 +262,13 @@ public sealed class RestorePlanValidatorService : IRestorePlanValidatorService
 
         var firstLog = orderedLogs.First();
         var lastLog = orderedLogs.Last();
+        var firstLogStart = firstLog.GetEffectiveStartTime();
 
-        if (targetTime < firstLog.StartTime)
+        if (targetTime < firstLogStart)
         {
             var message =
                 $"Restore target {targetTime:yyyy-MM-dd HH:mm:ss} is before the first log backup starts " +
-                $"(first log starts at {firstLog.StartTime:yyyy-MM-dd HH:mm:ss}).";
+                $"(first log starts at {firstLogStart:yyyy-MM-dd HH:mm:ss}).";
             result.AddError(message);
             _logger.LogError("STOPAT coverage failure: {Message}", message);
         }
@@ -285,7 +296,7 @@ public sealed class RestorePlanValidatorService : IRestorePlanValidatorService
         var inputLogs = plan.LogBackups.ToList();
 
         var orderedLogs = inputLogs
-            .OrderBy(l => l.StartTime)
+            .OrderBy(l => l.GetEffectiveStartTime())
             .ThenBy(l => l.EndTime ?? DateTime.MaxValue)
             .ThenBy(l => l.BackupFilePath, StringComparer.Ordinal)
             .ToList();

@@ -7,7 +7,9 @@ public class BackupJob
     public string DatabaseName { get; }
     public BackupType BackupType { get; }
     public BackupStatus Status { get; private set; }
+    // StartTime is scheduling/enqueue time, not physical SQL execution start.
     public DateTime StartTime { get; }
+    public DateTime? ExecutionStartTime { get; private set; }
     public DateTime? EndTime { get; private set; }
     public string BackupFilePath { get; private set; }
     public long? FileSizeBytes { get; private set; }
@@ -43,6 +45,7 @@ public class BackupJob
         BackupType backupType,
         BackupStatus status,
         DateTime startTime,
+        DateTime? executionStartTime,
         DateTime? endTime,
         string backupFilePath,
         long? fileSizeBytes,
@@ -62,6 +65,7 @@ public class BackupJob
         BackupType = backupType;
         Status = status;
         StartTime = startTime;
+        ExecutionStartTime = executionStartTime;
         EndTime = endTime;
         BackupFilePath = backupFilePath;
         FileSizeBytes = fileSizeBytes;
@@ -84,13 +88,15 @@ public class BackupJob
         decimal? firstLsn,
         decimal? lastLsn,
         decimal? databaseBackupLsn,
-        decimal? checkpointLsn)
+        decimal? checkpointLsn,
+        DateTime? executionStartTime = null)
     {
         return new BackupJob(
             databaseName,
             backupType,
             status,
             startTime,
+            executionStartTime,
             endTime,
             backupFilePath,
             fileSizeBytes,
@@ -99,6 +105,22 @@ public class BackupJob
             lastLsn,
             databaseBackupLsn,
             checkpointLsn);
+    }
+
+    public void MarkExecutionStarted()
+    {
+        if (Status != BackupStatus.Running)
+            throw new InvalidOperationException($"Cannot mark execution started. Current status: {Status}");
+
+        if (ExecutionStartTime.HasValue)
+            throw new InvalidOperationException("ExecutionStartTime is already set.");
+
+        ExecutionStartTime = DateTime.Now;
+    }
+
+    public DateTime GetEffectiveStartTime()
+    {
+        return ExecutionStartTime ?? StartTime;
     }
 
     public void MarkAsRunning()
