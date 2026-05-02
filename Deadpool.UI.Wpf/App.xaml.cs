@@ -127,6 +127,12 @@ public partial class App : Application
 			return new SqliteAgentHeartbeatRepository(sqlitePath, logger);
 		});
 
+		services.AddSingleton<IRestoreHistoryRepository>(sp =>
+		{
+			var logger = sp.GetRequiredService<ILogger<SqliteRestoreHistoryRepository>>();
+			return new SqliteRestoreHistoryRepository(sqlitePath, logger);
+		});
+
 		services.AddSingleton<IDashboardMonitoringService, DashboardMonitoringService>();
 		services.AddScoped<IRestorePlannerService, RestorePlannerService>();
 		services.AddScoped<IRestorePlanValidatorService, RestorePlanValidatorService>();

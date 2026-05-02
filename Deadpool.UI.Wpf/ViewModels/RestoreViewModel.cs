@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
 using System.Runtime.CompilerServices;
+using System.Windows.Media;
 using Deadpool.Core.Configuration;
 using Deadpool.Core.Domain.Entities;
 using Deadpool.Core.Domain.Enums;
@@ -18,6 +19,7 @@ public sealed class RestoreViewModel : INotifyPropertyChanged
     private readonly IRestorePlanValidatorService _validator;
     private readonly IRestoreSafetyGuard _safetyGuard;
     private readonly IRestoreOrchestratorService _orchestrator;
+    private readonly IRestoreHistoryRepository _historyRepository;
     private readonly ILogger<RestoreViewModel> _logger;
 
     private DateTime _targetTime;
@@ -31,6 +33,7 @@ public sealed class RestoreViewModel : INotifyPropertyChanged
     private DateTime? _targetDate;
     private int _selectedHour;
     private int _selectedMinute;
+    private RestoreHistoryItem? _selectedHistoryItem;
 
     private RestorePlan? _currentPlan;
 
@@ -39,6 +42,7 @@ public sealed class RestoreViewModel : INotifyPropertyChanged
         IRestorePlanValidatorService validator,
         IRestoreSafetyGuard safetyGuard,
         IRestoreOrchestratorService orchestrator,
+        IRestoreHistoryRepository historyRepository,
         IOptions<RestoreOrchestratorOptions> options,
         ILogger<RestoreViewModel> logger)
     {
@@ -46,6 +50,7 @@ public sealed class RestoreViewModel : INotifyPropertyChanged
         _validator = validator ?? throw new ArgumentNullException(nameof(validator));
         _safetyGuard = safetyGuard ?? throw new ArgumentNullException(nameof(safetyGuard));
         _orchestrator = orchestrator ?? throw new ArgumentNullException(nameof(orchestrator));
+        _historyRepository = historyRepository ?? throw new ArgumentNullException(nameof(historyRepository));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         DatabaseName = options.Value.DatabaseName;
@@ -65,9 +70,12 @@ public sealed class RestoreViewModel : INotifyPropertyChanged
 
         ValidationErrors = new ObservableCollection<string>();
         ValidationWarnings = new ObservableCollection<string>();
+        RestoreHistoryItems = new ObservableCollection<RestoreHistoryItem>();
 
         GeneratePlanCommand = new AsyncCommand(GeneratePlanAsync);
         ExecuteRestoreCommand = new AsyncCommand(ExecuteRestoreAsync, CanExecuteRestore);
+
+        _ = LoadRecentHistoryAsync();
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -181,6 +189,13 @@ public sealed class RestoreViewModel : INotifyPropertyChanged
 
     public ObservableCollection<string> ValidationErrors { get; }
     public ObservableCollection<string> ValidationWarnings { get; }
+    public ObservableCollection<RestoreHistoryItem> RestoreHistoryItems { get; }
+
+    public RestoreHistoryItem? SelectedHistoryItem
+    {
+        get => _selectedHistoryItem;
+        set => SetField(ref _selectedHistoryItem, value);
+    }
 
     public AsyncCommand GeneratePlanCommand { get; }
     public AsyncCommand ExecuteRestoreCommand { get; }
@@ -218,8 +233,59 @@ public sealed class RestoreViewModel : INotifyPropertyChanged
         }
         finally
         {
+            await LoadRecentHistoryAsync();
             RaiseCommandStates();
         }
+    }
+
+    private async Task LoadRecentHistoryAsync(int limit = 10)
+    {
+        try
+        {
+            var items = await _historyRepository.GetRecentAsync(limit);
+
+            RestoreHistoryItems.Clear();
+            foreach (var item in items.OrderByDescending(x => x.RestoreTimestamp))
+            {
+                RestoreHistoryItems.Add(new RestoreHistoryItem(
+                    timestamp: item.RestoreTimestamp,
+                    targetTime: item.TargetRestoreTime,
+                    success: item.Success,
+                    durationMs: item.DurationMs,
+                    summary: BuildSummary(item),
+                    fullBackupFile: item.FullBackupFile,
+                    diffBackupFile: item.DiffBackupFile,
+                    logBackups: item.LogBackupFiles,
+                    errorMessage: item.ErrorMessage));
+            }
+
+            if (RestoreHistoryItems.Count > 0)
+            {
+                SelectedHistoryItem ??= RestoreHistoryItems[0];
+            }
+            else
+            {
+                SelectedHistoryItem = null;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to load restore history.");
+        }
+    }
+
+    private static string BuildSummary(RestoreHistoryRecord record)
+    {
+        var hasDiff = !string.IsNullOrWhiteSpace(record.DiffBackupFile);
+        var logCount = record.LogBackupFiles?.Count ?? 0;
+
+        if (hasDiff)
+            return $"FULL+DIFF+{logCount} LOGs";
+
+        if (logCount > 0)
+            return $"FULL+{logCount} LOGs";
+
+        return "FULL only";
     }
 
     private async Task ExecuteRestoreAsync()
@@ -253,6 +319,7 @@ public sealed class RestoreViewModel : INotifyPropertyChanged
         }
         finally
         {
+            await LoadRecentHistoryAsync();
             RaiseCommandStates();
         }
     }
@@ -420,4 +487,46 @@ public sealed class RestoreStepViewModel
     public bool IsStopAt { get; }
     public int Order { get; }
     public bool IsLast { get; }
+}
+
+public sealed class RestoreHistoryItem
+{
+    public RestoreHistoryItem(
+        DateTime timestamp,
+        DateTime targetTime,
+        bool success,
+        long durationMs,
+        string summary,
+        string fullBackupFile,
+        string? diffBackupFile,
+        IReadOnlyList<string> logBackups,
+        string? errorMessage)
+    {
+        Timestamp = timestamp;
+        TargetTime = targetTime;
+        Success = success;
+        DurationMs = durationMs;
+        Summary = summary;
+        FullBackupFile = fullBackupFile;
+        DiffBackupFile = diffBackupFile;
+        LogBackups = logBackups;
+        ErrorMessage = errorMessage;
+    }
+
+    public DateTime Timestamp { get; }
+    public DateTime TargetTime { get; }
+    public bool Success { get; }
+    public long DurationMs { get; }
+    public string Summary { get; }
+    public string FullBackupFile { get; }
+    public string? DiffBackupFile { get; }
+    public IReadOnlyList<string> LogBackups { get; }
+    public string? ErrorMessage { get; }
+
+    public string StatusText => Success ? "Success" : "Failed";
+    public string DurationText => $"{DurationMs} ms";
+    public string LogChainText => LogBackups.Count == 0 ? "-" : string.Join(Environment.NewLine, LogBackups);
+    public string DiffBackupText => string.IsNullOrWhiteSpace(DiffBackupFile) ? "-" : DiffBackupFile;
+    public string ErrorText => string.IsNullOrWhiteSpace(ErrorMessage) ? "-" : ErrorMessage;
+    public Brush StatusBrush => Success ? Brushes.LimeGreen : Brushes.OrangeRed;
 }

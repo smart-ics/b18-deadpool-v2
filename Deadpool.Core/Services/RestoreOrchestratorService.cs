@@ -1,4 +1,5 @@
 using Deadpool.Core.Configuration;
+using Deadpool.Core.Domain.Entities;
 using Deadpool.Core.Domain.ValueObjects;
 using Deadpool.Core.Interfaces;
 using Microsoft.Extensions.Logging;
@@ -16,6 +17,7 @@ public sealed class RestoreOrchestratorService : IRestoreOrchestratorService
     private readonly IRestorePlanValidatorService _validator;
     private readonly IRestoreSafetyGuard _safetyGuard;
     private readonly IRestoreExecutionService _executor;
+    private readonly IRestoreHistoryRepository _historyRepository;
     private readonly IOptions<RestoreOrchestratorOptions> _orchestratorOptions;
     private readonly ILogger<RestoreOrchestratorService> _logger;
 
@@ -24,6 +26,7 @@ public sealed class RestoreOrchestratorService : IRestoreOrchestratorService
         IRestorePlanValidatorService validator,
         IRestoreSafetyGuard safetyGuard,
         IRestoreExecutionService executor,
+        IRestoreHistoryRepository historyRepository,
         IOptions<RestoreOrchestratorOptions> orchestratorOptions,
         ILogger<RestoreOrchestratorService> logger)
     {
@@ -31,6 +34,7 @@ public sealed class RestoreOrchestratorService : IRestoreOrchestratorService
         _validator = validator ?? throw new ArgumentNullException(nameof(validator));
         _safetyGuard = safetyGuard ?? throw new ArgumentNullException(nameof(safetyGuard));
         _executor = executor ?? throw new ArgumentNullException(nameof(executor));
+        _historyRepository = historyRepository ?? throw new ArgumentNullException(nameof(historyRepository));
         _orchestratorOptions = orchestratorOptions ?? throw new ArgumentNullException(nameof(orchestratorOptions));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
@@ -75,10 +79,29 @@ public sealed class RestoreOrchestratorService : IRestoreOrchestratorService
 
         _safetyGuard.EnsureConfirmed(effectiveConfirmation);
 
-        var executionResult = await _executor.ExecuteAsync(
-            plan,
-            _orchestratorOptions.Value.AllowOverwrite,
-            cancellationToken);
+        var executionStartUtc = DateTime.UtcNow;
+        RestoreExecutionResult executionResult;
+
+        try
+        {
+            executionResult = await _executor.ExecuteAsync(
+                plan,
+                _orchestratorOptions.Value.AllowOverwrite,
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            executionResult = new RestoreExecutionResult
+            {
+                Success = false,
+                ErrorMessage = ex.Message
+            };
+
+            await TrySaveRestoreHistoryAsync(plan, executionStartUtc, executionResult);
+            throw;
+        }
+
+        await TrySaveRestoreHistoryAsync(plan, executionStartUtc, executionResult);
 
         if (!executionResult.Success)
         {
@@ -99,6 +122,40 @@ public sealed class RestoreOrchestratorService : IRestoreOrchestratorService
             "Restore orchestration completed successfully for {DatabaseName}. Steps executed: {StepCount}.",
             plan.DatabaseName,
             executionResult.Steps.Count);
+    }
+
+    private async Task TrySaveRestoreHistoryAsync(
+        RestorePlan plan,
+        DateTime executionStartUtc,
+        RestoreExecutionResult executionResult)
+    {
+        try
+        {
+            var duration = DateTime.UtcNow - executionStartUtc;
+            var durationMs = Math.Max(0L, (long)duration.TotalMilliseconds);
+
+            var record = new RestoreHistoryRecord
+            {
+                DatabaseName = plan.DatabaseName,
+                RestoreTimestamp = executionStartUtc,
+                TargetRestoreTime = plan.TargetTime,
+                FullBackupFile = plan.FullBackup?.BackupFilePath ?? string.Empty,
+                DiffBackupFile = plan.DifferentialBackup?.BackupFilePath,
+                LogBackupFiles = plan.LogBackups.Select(x => x.BackupFilePath).ToList(),
+                Success = executionResult.Success,
+                DurationMs = durationMs,
+                ErrorMessage = executionResult.ErrorMessage
+            };
+
+            await _historyRepository.SaveAsync(record);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Failed to persist restore history for {DatabaseName}. Restore execution result remains unchanged.",
+                plan.DatabaseName);
+        }
     }
 
     private string ResolveDatabaseName()

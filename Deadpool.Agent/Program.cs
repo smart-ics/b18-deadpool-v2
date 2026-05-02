@@ -118,6 +118,11 @@ builder.Services.AddSingleton<IAgentHeartbeatRepository>(sp =>
     var logger = sp.GetRequiredService<ILogger<SqliteAgentHeartbeatRepository>>();
     return new SqliteAgentHeartbeatRepository(sqlitePath, logger);
 });
+builder.Services.AddSingleton<IRestoreHistoryRepository>(sp =>
+{
+    var logger = sp.GetRequiredService<ILogger<SqliteRestoreHistoryRepository>>();
+    return new SqliteRestoreHistoryRepository(sqlitePath, logger);
+});
 builder.Services.AddSingleton<IScheduleTracker, InMemoryScheduleTracker>();
 
 // Storage monitoring dependencies

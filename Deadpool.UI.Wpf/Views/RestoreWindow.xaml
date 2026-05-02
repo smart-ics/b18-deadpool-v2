@@ -26,6 +26,7 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="2*" />
             <RowDefinition Height="2*" />
+            <RowDefinition Height="2*" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -157,6 +158,72 @@
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0"
+                           Style="{StaticResource PanelHeadingTextStyle}"
+                           Text="Recent Restore History" />
+
+                <DataGrid Grid.Row="1"
+                          Margin="0,8,0,8"
+                          Style="{StaticResource DashboardDataGridStyle}"
+                          ItemsSource="{Binding RestoreHistoryItems}"
+                          SelectedItem="{Binding SelectedHistoryItem, Mode=TwoWay}"
+                          HeadersVisibility="Column"
+                          SelectionMode="Single"
+                          SelectionUnit="FullRow">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Timestamp" Binding="{Binding Timestamp, StringFormat={}{0:yyyy-MM-dd HH:mm:ss}}" Width="2*" />
+                        <DataGridTextColumn Header="Target" Binding="{Binding TargetTime, StringFormat={}{0:yyyy-MM-dd HH:mm:ss}}" Width="2*" />
+                        <DataGridTemplateColumn Header="Status" Width="*">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Ellipse Width="10" Height="10" Fill="{Binding StatusBrush}" Margin="0,0,6,0" />
+                                        <TextBlock Text="{Binding StatusText}" Foreground="{Binding StatusBrush}" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTextColumn Header="Duration" Binding="{Binding DurationText}" Width="*" />
+                        <DataGridTextColumn Header="Description" Binding="{Binding Summary}" Width="2*" />
+                    </DataGrid.Columns>
+                </DataGrid>
+
+                <Border Grid.Row="2" BorderBrush="#2B3B4A" BorderThickness="1" CornerRadius="4" Padding="8">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="8" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Full Backup" Foreground="{StaticResource MutedTextBrush}" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding SelectedHistoryItem.FullBackupFile}" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap" Margin="0,2,0,6" />
+
+                            <TextBlock Text="Diff Backup" Foreground="{StaticResource MutedTextBrush}" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding SelectedHistoryItem.DiffBackupText}" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap" Margin="0,2,0,0" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Log Chain" Foreground="{StaticResource MutedTextBrush}" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding SelectedHistoryItem.LogChainText}" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap" Margin="0,2,0,6" />
+
+                            <TextBlock Text="Error" Foreground="{StaticResource MutedTextBrush}" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding SelectedHistoryItem.ErrorText}" Foreground="#FF9A9A" TextWrapping="Wrap" Margin="0,2,0,0" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="4" Style="{StaticResource CardBorderStyle}" Margin="0,0,0,10">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
@@ -207,7 +274,7 @@
             </Grid>
         </Border>
 
-        <Border Grid.Row="4" Style="{StaticResource CardBorderStyle}" Margin="0,0,0,10">
+        <Border Grid.Row="5" Style="{StaticResource CardBorderStyle}" Margin="0,0,0,10">
             <StackPanel>
                 <CheckBox IsChecked="{Binding IsConfirmed, Mode=TwoWay}"
                           Foreground="{StaticResource TextBrush}"
@@ -223,7 +290,7 @@
             </StackPanel>
         </Border>
 
-        <Grid Grid.Row="5" Margin="0,0,0,10">
+        <Grid Grid.Row="6" Margin="0,0,0,10">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
@@ -245,7 +312,7 @@
                     Content="Cancel" />
         </Grid>
 
-        <Border Grid.Row="6" Style="{StaticResource CardBorderStyle}">
+        <Border Grid.Row="7" Style="{StaticResource CardBorderStyle}">
             <TextBlock Text="{Binding StatusMessage}"
                        Foreground="{StaticResource TextBrush}"
                        TextWrapping="Wrap" />

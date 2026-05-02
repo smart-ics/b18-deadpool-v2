@@ -17,6 +17,7 @@ public class RestoreOrchestratorServiceTests
     private readonly Mock<IRestorePlanValidatorService> _validatorMock = new();
     private readonly Mock<IRestoreSafetyGuard> _safetyGuardMock = new();
     private readonly Mock<IRestoreExecutionService> _executorMock = new();
+    private readonly Mock<IRestoreHistoryRepository> _historyRepositoryMock = new();
 
     [Fact]
     public async Task ExecuteRestore_WhenValidationFails_StopsBeforeExecutor()
@@ -91,6 +92,14 @@ public class RestoreOrchestratorServiceTests
                 true,
                 It.IsAny<CancellationToken>()),
             Times.Once);
+
+        _historyRepositoryMock.Verify(
+            h => h.SaveAsync(It.Is<RestoreHistoryRecord>(r =>
+                r.DatabaseName == "TestDB" &&
+                r.Success &&
+                r.FullBackupFile == @"C:\Backups\full.bak" &&
+                r.DurationMs >= 0)),
+            Times.Once);
     }
 
     [Fact]
@@ -147,6 +156,81 @@ public class RestoreOrchestratorServiceTests
 
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*Restore execution failed*SQL timeout*");
+
+        _historyRepositoryMock.Verify(
+            h => h.SaveAsync(It.Is<RestoreHistoryRecord>(r =>
+                r.DatabaseName == "TestDB" &&
+                !r.Success &&
+                r.ErrorMessage == "SQL timeout")),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task ExecuteRestore_WhenExecutorThrows_SavesFailureHistoryAndRethrows()
+    {
+        var targetTime = DateTime.UtcNow;
+        var plan = BuildValidPlan(targetTime);
+
+        _plannerMock
+            .Setup(p => p.BuildRestorePlanAsync("TestDB", targetTime))
+            .ReturnsAsync(plan);
+
+        _validatorMock
+            .Setup(v => v.Validate(plan))
+            .Returns(new RestoreValidationResult());
+
+        _executorMock
+            .Setup(e => e.ExecuteAsync(plan, true, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("Connection dropped"));
+
+        var sut = CreateSut();
+
+        Func<Task> act = async () => await sut.ExecuteRestore(targetTime);
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("Connection dropped");
+
+        _historyRepositoryMock.Verify(
+            h => h.SaveAsync(It.Is<RestoreHistoryRecord>(r =>
+                r.DatabaseName == "TestDB" &&
+                !r.Success &&
+                r.ErrorMessage == "Connection dropped")),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task ExecuteRestore_WhenHistorySaveFails_DoesNotBlockSuccessfulRestore()
+    {
+        var targetTime = DateTime.UtcNow;
+        var plan = BuildValidPlan(targetTime);
+
+        _plannerMock
+            .Setup(p => p.BuildRestorePlanAsync("TestDB", targetTime))
+            .ReturnsAsync(plan);
+
+        _validatorMock
+            .Setup(v => v.Validate(plan))
+            .Returns(new RestoreValidationResult());
+
+        _executorMock
+            .Setup(e => e.ExecuteAsync(plan, true, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new RestoreExecutionResult { Success = true });
+
+        _historyRepositoryMock
+            .Setup(h => h.SaveAsync(It.IsAny<RestoreHistoryRecord>()))
+            .ThrowsAsync(new Exception("disk locked"));
+
+        var sut = CreateSut();
+
+        await sut.ExecuteRestore(targetTime);
+
+        _executorMock.Verify(
+            e => e.ExecuteAsync(plan, true, It.IsAny<CancellationToken>()),
+            Times.Once);
+
+        _historyRepositoryMock.Verify(
+            h => h.SaveAsync(It.IsAny<RestoreHistoryRecord>()),
+            Times.Once);
     }
 
     [Fact]
@@ -159,6 +243,7 @@ public class RestoreOrchestratorServiceTests
             _validatorMock.Object,
             _safetyGuardMock.Object,
             _executorMock.Object,
+            _historyRepositoryMock.Object,
             options,
             NullLogger<RestoreOrchestratorService>.Instance);
 
@@ -170,6 +255,10 @@ public class RestoreOrchestratorServiceTests
 
     private RestoreOrchestratorService CreateSut()
     {
+        _historyRepositoryMock
+            .Setup(h => h.SaveAsync(It.IsAny<RestoreHistoryRecord>()))
+            .Returns(Task.CompletedTask);
+
         var options = new RestoreOrchestratorOptions
         {
             DatabaseName = "TestDB",
@@ -183,6 +272,7 @@ public class RestoreOrchestratorServiceTests
             _validatorMock.Object,
             _safetyGuardMock.Object,
             _executorMock.Object,
+            _historyRepositoryMock.Object,
             Options.Create(options),
             NullLogger<RestoreOrchestratorService>.Instance);
     }
