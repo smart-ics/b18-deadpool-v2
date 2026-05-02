@@ -3,6 +3,7 @@ using Deadpool.Core.Domain.Enums;
 using Deadpool.Core.Domain.ValueObjects;
 using Deadpool.Core.Interfaces;
 using Deadpool.Core.Services;
+using System.Collections.Concurrent;
 
 namespace Deadpool.Agent.Workers;
 
@@ -15,6 +16,8 @@ namespace Deadpool.Agent.Workers;
 public sealed class BackupExecutionWorker : BackgroundService
 {
     private static readonly TimeSpan PollingInterval = TimeSpan.FromSeconds(30);
+    private static readonly ConcurrentDictionary<string, SemaphoreSlim> _locks =
+        new(StringComparer.OrdinalIgnoreCase);
 
     private readonly ILogger<BackupExecutionWorker> _logger;
     private readonly IBackupJobRepository _jobRepository;
@@ -72,6 +75,11 @@ public sealed class BackupExecutionWorker : BackgroundService
 
     private async Task TryExecuteJobAsync(BackupJob job, CancellationToken cancellationToken)
     {
+        var databaseName = job.DatabaseName ?? string.Empty;
+        var semaphore = _locks.GetOrAdd(databaseName, _ => new SemaphoreSlim(1, 1));
+
+        await semaphore.WaitAsync(cancellationToken);
+
         try
         {
             var jobId = BuildJobId(job);
@@ -166,6 +174,10 @@ public sealed class BackupExecutionWorker : BackgroundService
                     "Failed to update job status to Failed for {Database} {Type}",
                     job.DatabaseName, job.BackupType);
             }
+        }
+        finally
+        {
+            semaphore.Release();
         }
     }
 

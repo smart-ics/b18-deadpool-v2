@@ -6,11 +6,66 @@ using Deadpool.Core.Interfaces;
 using Deadpool.Core.Services;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
+using System.Collections.Concurrent;
 
 namespace Deadpool.Tests.Unit;
 
 public class BackupExecutionWorkerTests
 {
+    [Fact]
+    public async Task Executor_ShouldSerializeBackups_PerDatabaseAcrossWorkers()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), $"deadpool-worker-lock-tests-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempRoot);
+
+        try
+        {
+            var repository = new ConcurrentClaimInMemoryBackupJobRepository();
+            var backupExecutor = new ConcurrencyTrackingBackupExecutor(delayMs: 250);
+            var metadataService = new StubMetadataService();
+            var filePathService = new BackupFilePathService(tempRoot);
+
+            var worker1 = new BackupExecutionWorker(
+                NullLogger<BackupExecutionWorker>.Instance,
+                repository,
+                backupExecutor,
+                filePathService,
+                metadataService);
+
+            var worker2 = new BackupExecutionWorker(
+                NullLogger<BackupExecutionWorker>.Instance,
+                repository,
+                backupExecutor,
+                filePathService,
+                metadataService);
+
+            var fullJob = new BackupJob("LockDB", BackupType.Full, Path.Combine(tempRoot, "full-placeholder.bak"));
+            var logJob = new BackupJob("LockDB", BackupType.TransactionLog, Path.Combine(tempRoot, "log-placeholder.trn"));
+
+            await repository.CreateAsync(fullJob);
+            await repository.CreateAsync(logJob);
+
+            using var cts = new CancellationTokenSource();
+
+            var run1 = worker1.StartAsync(cts.Token);
+            var run2 = worker2.StartAsync(cts.Token);
+
+            await Task.Delay(1500);
+
+            await cts.CancelAsync();
+            await Task.WhenAll(run1, run2);
+
+            fullJob.Status.Should().Be(BackupStatus.Completed);
+            logJob.Status.Should().Be(BackupStatus.Completed);
+            backupExecutor.GetMaxConcurrency("LockDB").Should().Be(1);
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+                Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
     [Fact]
     public async Task Executor_ShouldTransitionLifecycleAndAssignRealFilePath_ForAllBackupTypes()
     {
@@ -342,5 +397,212 @@ public class BackupExecutionWorkerTests
                 lastLSN: null,
                 databaseBackupLSN: null,
                 checkpointLSN: null));
+    }
+
+    private sealed class ConcurrencyTrackingBackupExecutor : IBackupExecutor
+    {
+        private readonly int _delayMs;
+        private readonly ConcurrentDictionary<string, int> _activeByDatabase = new(StringComparer.OrdinalIgnoreCase);
+        private readonly ConcurrentDictionary<string, int> _maxByDatabase = new(StringComparer.OrdinalIgnoreCase);
+
+        public ConcurrencyTrackingBackupExecutor(int delayMs)
+        {
+            _delayMs = delayMs;
+        }
+
+        public int GetMaxConcurrency(string databaseName)
+        {
+            return _maxByDatabase.TryGetValue(databaseName, out var max)
+                ? max
+                : 0;
+        }
+
+        public Task ExecuteFullBackupAsync(string databaseName, string backupFilePath)
+            => ExecuteWithTrackingAsync(databaseName, backupFilePath);
+
+        public Task ExecuteDifferentialBackupAsync(string databaseName, string backupFilePath)
+            => ExecuteWithTrackingAsync(databaseName, backupFilePath);
+
+        public Task ExecuteTransactionLogBackupAsync(string databaseName, string backupFilePath)
+            => ExecuteWithTrackingAsync(databaseName, backupFilePath);
+
+        public Task<bool> VerifyBackupFileAsync(string backupFilePath)
+            => Task.FromResult(File.Exists(backupFilePath));
+
+        public Task<BackupLSNMetadata?> GetBackupLSNMetadataAsync(string databaseName, string backupFilePath)
+        {
+            if (backupFilePath.Contains("_FULL_", StringComparison.OrdinalIgnoreCase))
+            {
+                return Task.FromResult<BackupLSNMetadata?>(new BackupLSNMetadata(
+                    firstLSN: null,
+                    lastLSN: null,
+                    databaseBackupLSN: 1000m,
+                    checkpointLSN: 1000m));
+            }
+
+            return Task.FromResult<BackupLSNMetadata?>(new BackupLSNMetadata(
+                firstLSN: 2000m,
+                lastLSN: 3000m,
+                databaseBackupLSN: 1000m,
+                checkpointLSN: null));
+        }
+
+        private async Task ExecuteWithTrackingAsync(string databaseName, string backupFilePath)
+        {
+            var current = _activeByDatabase.AddOrUpdate(databaseName, 1, (_, active) => active + 1);
+            _maxByDatabase.AddOrUpdate(databaseName, current, (_, max) => Math.Max(max, current));
+
+            try
+            {
+                await Task.Delay(_delayMs);
+                await StubFileBackupExecutor.WriteFileForTestAsync(backupFilePath);
+            }
+            finally
+            {
+                _activeByDatabase.AddOrUpdate(databaseName, 0, (_, active) => Math.Max(0, active - 1));
+            }
+        }
+    }
+
+    private sealed class ConcurrentClaimInMemoryBackupJobRepository : IBackupJobRepository
+    {
+        private readonly object _sync = new();
+        private readonly List<BackupJob> _jobs = new();
+        private readonly HashSet<string> _claimed = new(StringComparer.Ordinal);
+
+        public Task CreateAsync(BackupJob backupJob)
+        {
+            lock (_sync)
+            {
+                _jobs.Add(backupJob);
+            }
+
+            return Task.CompletedTask;
+        }
+
+        public Task UpdateAsync(BackupJob backupJob) => Task.CompletedTask;
+
+        public Task<BackupJob?> GetByIdAsync(int id) => Task.FromResult<BackupJob?>(null);
+
+        public Task<IEnumerable<BackupJob>> GetRecentJobsAsync(string databaseName, int count)
+        {
+            lock (_sync)
+            {
+                var result = _jobs
+                    .Where(j => j.DatabaseName == databaseName)
+                    .OrderByDescending(j => j.StartTime)
+                    .Take(count)
+                    .ToList();
+
+                return Task.FromResult<IEnumerable<BackupJob>>(result);
+            }
+        }
+
+        public Task<BackupJob?> GetLastSuccessfulFullBackupAsync(string databaseName)
+        {
+            lock (_sync)
+            {
+                var job = _jobs
+                    .Where(j => j.DatabaseName == databaseName)
+                    .Where(j => j.BackupType == BackupType.Full)
+                    .Where(j => j.Status == BackupStatus.Completed)
+                    .OrderByDescending(j => j.StartTime)
+                    .FirstOrDefault();
+
+                return Task.FromResult(job);
+            }
+        }
+
+        public async Task<bool> HasSuccessfulFullBackupAsync(string databaseName)
+        {
+            return await GetLastSuccessfulFullBackupAsync(databaseName) != null;
+        }
+
+        public Task<IEnumerable<BackupJob>> GetPendingJobsAsync(int maxCount)
+        {
+            lock (_sync)
+            {
+                var pending = _jobs
+                    .Where(j => j.Status == BackupStatus.Pending)
+                    .OrderBy(j => j.StartTime)
+                    .Take(maxCount)
+                    .ToList();
+
+                return Task.FromResult<IEnumerable<BackupJob>>(pending);
+            }
+        }
+
+        public Task<bool> TryClaimJobAsync(BackupJob job)
+        {
+            lock (_sync)
+            {
+                var key = $"{job.DatabaseName}:{job.BackupType}:{job.StartTime:O}";
+                if (_claimed.Contains(key))
+                    return Task.FromResult(false);
+
+                if (!_jobs.Contains(job) || job.Status != BackupStatus.Pending)
+                    return Task.FromResult(false);
+
+                _claimed.Add(key);
+                return Task.FromResult(true);
+            }
+        }
+
+        public Task<BackupJob?> GetLastSuccessfulBackupAsync(string databaseName, BackupType backupType)
+        {
+            lock (_sync)
+            {
+                var job = _jobs
+                    .Where(j => j.DatabaseName == databaseName)
+                    .Where(j => j.BackupType == backupType)
+                    .Where(j => j.Status == BackupStatus.Completed)
+                    .OrderByDescending(j => j.StartTime)
+                    .FirstOrDefault();
+
+                return Task.FromResult(job);
+            }
+        }
+
+        public Task<BackupJob?> GetLastFailedBackupAsync(string databaseName)
+        {
+            lock (_sync)
+            {
+                var job = _jobs
+                    .Where(j => j.DatabaseName == databaseName)
+                    .Where(j => j.Status == BackupStatus.Failed)
+                    .OrderByDescending(j => j.StartTime)
+                    .FirstOrDefault();
+
+                return Task.FromResult(job);
+            }
+        }
+
+        public Task<IEnumerable<BackupJob>> GetBackupChainAsync(string databaseName, DateTime since)
+        {
+            lock (_sync)
+            {
+                var chain = _jobs
+                    .Where(j => j.DatabaseName == databaseName)
+                    .Where(j => j.Status == BackupStatus.Completed)
+                    .Where(j => j.StartTime >= since)
+                    .OrderBy(j => j.StartTime)
+                    .ToList();
+
+                return Task.FromResult<IEnumerable<BackupJob>>(chain);
+            }
+        }
+
+        public Task<IEnumerable<BackupJob>> GetBackupsByDatabaseAsync(string databaseName)
+        {
+            lock (_sync)
+            {
+                var backups = _jobs
+                    .Where(j => j.DatabaseName == databaseName)
+                    .OrderByDescending(j => j.StartTime)
+                    .ToList();
+
+                return Task.FromResult<IEnumerable<BackupJob>>(backups);
+            }
+        }
     }
 }
