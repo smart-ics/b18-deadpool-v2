@@ -24,7 +24,7 @@ public record DashboardSnapshot
         StorageStatusSummary storageStatus,
         DatabasePulseStatus? databasePulseStatus = null)
     {
-        SnapshotTime = DateTime.UtcNow;
+        SnapshotTime = DateTime.Now;
         DatabaseName = databaseName;
         LastBackupStatus = lastBackupStatus;
         ChainInitializationStatus = chainInitializationStatus;

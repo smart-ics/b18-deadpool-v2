@@ -62,7 +62,7 @@ public class InMemoryStorageHealthCheckRepository : IStorageHealthCheckRepositor
         if (retention <= TimeSpan.Zero)
             throw new ArgumentException("Retention period must be positive.", nameof(retention));
 
-        var cutoffTime = DateTime.UtcNow - retention;
+        var cutoffTime = DateTime.Now - retention;
 
         lock (_lock)
         {

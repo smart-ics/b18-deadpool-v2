@@ -66,7 +66,7 @@ public sealed class InMemoryBackupHealthCheckRepository : IBackupHealthCheckRepo
     {
         lock (_lock)
         {
-            var cutoff = DateTime.UtcNow - retention;
+            var cutoff = DateTime.Now - retention;
             _healthChecks.RemoveAll(h => h.CheckTime < cutoff);
         }
     }

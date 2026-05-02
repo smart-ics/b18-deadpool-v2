@@ -76,7 +76,7 @@ public sealed class BootstrapWorker : BackgroundService
                 // on its first tick. SeedTrackerFromRepository in BackupSchedulerWorker also
                 // does this from the repository, but racing against it is safe: both writes
                 // record a recent time, whichever lands last still prevents a duplicate job.
-                _scheduleTracker.MarkScheduled(databaseName, BackupType.Full, DateTime.UtcNow);
+                _scheduleTracker.MarkScheduled(databaseName, BackupType.Full, DateTime.Now);
                 return;
             }
 
@@ -93,7 +93,7 @@ public sealed class BootstrapWorker : BackgroundService
                 // tick. Bootstrap executed the Full directly (outside the job queue); marking
                 // it as scheduled now makes the cron anchor current so the next cron
                 // occurrence, not the current one, will be the first scheduler-driven Full.
-                _scheduleTracker.MarkScheduled(databaseName, BackupType.Full, DateTime.UtcNow);
+                _scheduleTracker.MarkScheduled(databaseName, BackupType.Full, DateTime.Now);
                 _logger.LogInformation(
                     "Bootstrap [{Database}]: chain initialized successfully.", databaseName);
             }

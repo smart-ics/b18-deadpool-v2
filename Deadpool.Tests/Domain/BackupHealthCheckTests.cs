@@ -13,7 +13,7 @@ public class BackupHealthCheckTests
         var healthCheck = new BackupHealthCheck("TestDB");
 
         healthCheck.DatabaseName.Should().Be("TestDB");
-        healthCheck.CheckTime.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(1));
+        healthCheck.CheckTime.Should().BeCloseTo(DateTime.Now, TimeSpan.FromSeconds(1));
         healthCheck.OverallHealth.Should().Be(HealthStatus.Healthy);
         healthCheck.IsHealthy().Should().BeTrue();
         healthCheck.Warnings.Should().BeEmpty();
@@ -34,7 +34,7 @@ public class BackupHealthCheckTests
     public void RecordLastSuccessfulFullBackup_ShouldSetTimestamp()
     {
         var healthCheck = new BackupHealthCheck("TestDB");
-        var backupTime = DateTime.UtcNow.AddHours(-2);
+        var backupTime = DateTime.Now.AddHours(-2);
 
         healthCheck.RecordLastSuccessfulFullBackup(backupTime);
 

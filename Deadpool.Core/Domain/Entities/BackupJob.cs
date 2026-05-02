@@ -35,7 +35,7 @@ public class BackupJob
         BackupType = backupType;
         BackupFilePath = backupFilePath;
         Status = BackupStatus.Pending;
-        StartTime = DateTime.UtcNow;
+        StartTime = DateTime.Now;
     }
 
     private BackupJob(
@@ -127,7 +127,7 @@ public class BackupJob
 
         BackupFilePath = backupFilePath;
         Status = BackupStatus.Completed;
-        EndTime = DateTime.UtcNow;
+        EndTime = DateTime.Now;
         FileSizeBytes = fileSizeBytes;
     }
 
@@ -155,7 +155,7 @@ public class BackupJob
             throw new ArgumentException("Error message cannot be empty.", nameof(errorMessage));
 
         Status = BackupStatus.Failed;
-        EndTime = DateTime.UtcNow;
+        EndTime = DateTime.Now;
         ErrorMessage = errorMessage;
     }
 

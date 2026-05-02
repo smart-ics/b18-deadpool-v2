@@ -20,7 +20,7 @@ public class DatabasePulseService : IDatabasePulseService
 
     public async Task<DatabasePulseStatus> CheckAsync(CancellationToken cancellationToken = default)
     {
-        var now = DateTime.UtcNow;
+        var now = DateTime.Now;
         try
         {
             await _probe.ProbeAsync(cancellationToken);

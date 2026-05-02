@@ -152,8 +152,8 @@ public partial class BackupJobMonitorForm : Form
         {
             j.BackupType,
             j.Status,
-            StartTime = j.StartTime.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss"),
-            EndTime = j.EndTime?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss") ?? "--",
+            StartTime = j.StartTime.ToString("yyyy-MM-dd HH:mm:ss"),
+            EndTime = j.EndTime?.ToString("yyyy-MM-dd HH:mm:ss") ?? "--",
             j.Duration,
             Size = j.FileSizeDisplay,
             FilePath = Path.GetFileName(j.FilePath)
@@ -228,8 +228,8 @@ public partial class BackupJobMonitorForm : Form
         var details = $"Database: {selectedJob.DatabaseName}\r\n";
         details += $"Backup Type: {selectedJob.BackupType}\r\n";
         details += $"Status: {selectedJob.Status}\r\n";
-        details += $"Start Time: {selectedJob.StartTime.ToLocalTime():yyyy-MM-dd HH:mm:ss}\r\n";
-        details += $"End Time: {selectedJob.EndTime?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss") ?? "In Progress"}\r\n";
+        details += $"Start Time: {selectedJob.StartTime:yyyy-MM-dd HH:mm:ss}\r\n";
+        details += $"End Time: {selectedJob.EndTime?.ToString("yyyy-MM-dd HH:mm:ss") ?? "In Progress"}\r\n";
         details += $"Duration: {selectedJob.Duration}\r\n";
         details += $"File Path: {selectedJob.FilePath}\r\n";
         details += $"File Size: {selectedJob.FileSizeDisplay}\r\n";

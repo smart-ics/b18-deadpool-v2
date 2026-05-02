@@ -28,43 +28,44 @@ public record BackupSchedule
         CronExpression = cronExpression;
     }
 
-    // Returns the next UTC occurrence strictly after fromUtc, or null if none.
-    public DateTime? GetNextOccurrence(DateTime fromUtc)
+    // Returns the next local-time occurrence strictly after 'from', or null if none.
+    public DateTime? GetNextOccurrence(DateTime from)
     {
-        // DateTime.MinValue has Kind=Unspecified; Cronos requires Kind=Utc.
-        // Treat Unspecified as Utc — callers should pass Utc, but defend here.
-        if (fromUtc.Kind != DateTimeKind.Utc)
-            fromUtc = DateTime.SpecifyKind(fromUtc, DateTimeKind.Utc);
+        // Treat Unspecified as Local. Convert Utc to Local for callers that still pass Utc.
+        if (from.Kind == DateTimeKind.Utc)
+            from = from.ToLocalTime();
+        else if (from.Kind == DateTimeKind.Unspecified)
+            from = DateTime.SpecifyKind(from, DateTimeKind.Local);
 
-        return _parsed.GetNextOccurrence(fromUtc, TimeZoneInfo.Utc);
+        return _parsed.GetNextOccurrence(from, TimeZoneInfo.Local);
     }
 
-    // A schedule is due when at least one occurrence falls in (lastCheckUtc, nowUtc].
-    public bool IsDue(DateTime lastCheckUtc, DateTime nowUtc)
+    // A schedule is due when at least one occurrence falls in (lastCheck, now].
+    public bool IsDue(DateTime lastCheck, DateTime now)
     {
-        var next = GetNextOccurrence(lastCheckUtc);
-        return next.HasValue && next.Value <= nowUtc;
+        var next = GetNextOccurrence(lastCheck);
+        return next.HasValue && next.Value <= now;
     }
 
-    // Returns the latest occurrence that falls in (lastCheckUtc, nowUtc], i.e. the
+    // Returns the latest occurrence that falls in (lastCheck, now], i.e. the
     // canonical "what just fired" time.  This is used to advance the tracker so that
     // multiple ticks within the same inter-occurrence window all converge on the same
     // anchor, preventing duplicate job creation.
     //
-    // Implementation note: For first boot or long downtime (lastCheckUtc far in the past),
+    // Implementation note: For first boot or long downtime (lastCheck far in the past),
     // we limit the backward scan to a reasonable window (30 days) to avoid excessive
     // iteration. This is safe because we only need the most recent occurrence, not all
     // historical occurrences.
-    public DateTime? GetMostRecentOccurrence(DateTime lastCheckUtc, DateTime nowUtc)
+    public DateTime? GetMostRecentOccurrence(DateTime lastCheck, DateTime now)
     {
         // If lastCheck is more than 30 days before now, start from 30 days ago instead.
         // This prevents walking through years of history on first boot.
-        var searchStart = lastCheckUtc;
+        var searchStart = lastCheck;
         var maxLookback = TimeSpan.FromDays(30);
 
-        if (nowUtc - lastCheckUtc > maxLookback)
+        if (now - lastCheck > maxLookback)
         {
-            searchStart = nowUtc - maxLookback;
+            searchStart = now - maxLookback;
         }
 
         DateTime? candidate = null;
@@ -73,7 +74,7 @@ public record BackupSchedule
         while (true)
         {
             var next = GetNextOccurrence(cursor);
-            if (!next.HasValue || next.Value > nowUtc)
+            if (!next.HasValue || next.Value > now)
                 break;
 
             candidate = next.Value;

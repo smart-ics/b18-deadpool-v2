@@ -51,7 +51,7 @@ public sealed class BackupSchedulerWorker : BackgroundService
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            await TickAsync(DateTime.UtcNow, stoppingToken);
+            await TickAsync(DateTime.Now, stoppingToken);
             await Task.Delay(PollingInterval, stoppingToken);
         }
 
@@ -91,7 +91,7 @@ public sealed class BackupSchedulerWorker : BackgroundService
     }
 
     // Main tick — separated from the loop for testability.
-    internal async Task TickAsync(DateTime nowUtc, CancellationToken ct)
+    internal async Task TickAsync(DateTime now, CancellationToken ct)
     {
         foreach (var db in _databases)
         {
@@ -103,7 +103,7 @@ public sealed class BackupSchedulerWorker : BackgroundService
 
                 try
                 {
-                    await TryScheduleAsync(db.DatabaseName, backupType, schedule, nowUtc);
+                    await TryScheduleAsync(db.DatabaseName, backupType, schedule, now);
                 }
                 catch (Exception ex)
                 {
@@ -121,7 +121,7 @@ public sealed class BackupSchedulerWorker : BackgroundService
         string databaseName,
         BackupType backupType,
         BackupSchedule schedule,
-        DateTime nowUtc)
+        DateTime now)
     {
         // Domain safety rule: Differential and Log backups require an initialized chain.
         if (backupType != BackupType.Full)
@@ -138,27 +138,27 @@ public sealed class BackupSchedulerWorker : BackgroundService
 
         var lastScheduled = _tracker.GetLastScheduled(databaseName, backupType);
 
-        if (!schedule.IsDue(lastScheduled, nowUtc))
+        if (!schedule.IsDue(lastScheduled, now))
             return;
 
         // Use the most recent occurrence as the canonical anchor, not necessarily the
         // first one.  This ensures repeated ticks within the same inter-occurrence
         // window always advance the tracker to the same point, preventing duplicates.
-        var occurrenceUtc = schedule.GetMostRecentOccurrence(lastScheduled, nowUtc)!.Value;
+        var occurrence = schedule.GetMostRecentOccurrence(lastScheduled, now)!.Value;
 
         _logger.LogInformation(
-            "Scheduling {Type} backup for {Db} (occurrence {Occurrence:u}).",
-            backupType, databaseName, occurrenceUtc);
+            "Scheduling {Type} backup for {Db} (occurrence {Occurrence}).",
+            backupType, databaseName, occurrence);
 
         var job = new BackupJob(
             databaseName,
             backupType,
-            BuildPlaceholderPath(databaseName, backupType, occurrenceUtc));
+            BuildPlaceholderPath(databaseName, backupType, occurrence));
 
         await _jobRepository.CreateAsync(job);
 
         // Update tracker only after the job was successfully persisted.
-        _tracker.MarkScheduled(databaseName, backupType, occurrenceUtc);
+        _tracker.MarkScheduled(databaseName, backupType, occurrence);
 
         _logger.LogInformation(
             "Scheduled {Type} backup job created for {Db}.", backupType, databaseName);
@@ -167,7 +167,7 @@ public sealed class BackupSchedulerWorker : BackgroundService
     // The real file path is assigned by BackupExecutorWorker (P0-006) when it picks
     // up the pending job. We write a recognisable placeholder here.
     private static string BuildPlaceholderPath(
-        string databaseName, BackupType backupType, DateTime occurrenceUtc)
+        string databaseName, BackupType backupType, DateTime occurrence)
     {
         var ext = backupType == BackupType.TransactionLog ? "trn" : "bak";
         var tag = backupType switch
@@ -177,7 +177,7 @@ public sealed class BackupSchedulerWorker : BackgroundService
             BackupType.TransactionLog => "LOG",
             _ => "UNKNOWN"
         };
-        return $"PENDING_{databaseName}_{tag}_{occurrenceUtc:yyyyMMdd_HHmm}.{ext}";
+        return $"PENDING_{databaseName}_{tag}_{occurrence:yyyyMMdd_HHmm}.{ext}";
     }
 
     // Internal value type used only by this worker to pair each schedule with its type.

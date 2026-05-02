@@ -217,7 +217,7 @@ public class BackupPolicyTests
             _logSchedule,
             30);
 
-        var backupDate = DateTime.UtcNow.AddDays(-15);
+        var backupDate = DateTime.Now.AddDays(-15);
 
         var canDelete = policy.CanDeleteBackup(BackupType.Full, backupDate, null);
 
@@ -235,7 +235,7 @@ public class BackupPolicyTests
             _logSchedule,
             30);
 
-        var backupDate = DateTime.UtcNow.AddDays(-45);
+        var backupDate = DateTime.Now.AddDays(-45);
 
         var canDelete = policy.CanDeleteBackup(BackupType.Full, backupDate, null);
 
@@ -253,7 +253,7 @@ public class BackupPolicyTests
             _logSchedule,
             30);
 
-        var lastFullBackupDate = DateTime.UtcNow.AddDays(-45);
+        var lastFullBackupDate = DateTime.Now.AddDays(-45);
 
         var canDelete = policy.CanDeleteBackup(BackupType.Full, lastFullBackupDate, lastFullBackupDate);
 
@@ -271,8 +271,8 @@ public class BackupPolicyTests
             _logSchedule,
             30);
 
-        var backupDate = DateTime.UtcNow.AddDays(-40);
-        var lastFullBackupDate = DateTime.UtcNow.AddDays(-45);
+        var backupDate = DateTime.Now.AddDays(-40);
+        var lastFullBackupDate = DateTime.Now.AddDays(-45);
 
         var canDelete = policy.CanDeleteBackup(BackupType.Full, backupDate, lastFullBackupDate);
 
@@ -290,8 +290,8 @@ public class BackupPolicyTests
             _logSchedule,
             30);
 
-        var backupDate = DateTime.UtcNow.AddDays(-60);
-        var lastFullBackupDate = DateTime.UtcNow.AddDays(-45);
+        var backupDate = DateTime.Now.AddDays(-60);
+        var lastFullBackupDate = DateTime.Now.AddDays(-45);
 
         var canDelete = policy.CanDeleteBackup(BackupType.Full, backupDate, lastFullBackupDate);
 
@@ -309,8 +309,8 @@ public class BackupPolicyTests
             _logSchedule,
             30);
 
-        var backupDate = DateTime.UtcNow.AddDays(-40);
-        var lastFullBackupDate = DateTime.UtcNow.AddDays(-45);
+        var backupDate = DateTime.Now.AddDays(-40);
+        var lastFullBackupDate = DateTime.Now.AddDays(-45);
 
         var canDelete = policy.CanDeleteBackup(BackupType.Differential, backupDate, lastFullBackupDate);
 
@@ -328,8 +328,8 @@ public class BackupPolicyTests
             _logSchedule,
             30);
 
-        var backupDate = DateTime.UtcNow.AddDays(-60);
-        var lastFullBackupDate = DateTime.UtcNow.AddDays(-45);
+        var backupDate = DateTime.Now.AddDays(-60);
+        var lastFullBackupDate = DateTime.Now.AddDays(-45);
 
         var canDelete = policy.CanDeleteBackup(BackupType.Differential, backupDate, lastFullBackupDate);
 
@@ -347,8 +347,8 @@ public class BackupPolicyTests
             _logSchedule,
             30);
 
-        var backupDate = DateTime.UtcNow.AddDays(-40);
-        var lastFullBackupDate = DateTime.UtcNow.AddDays(-45);
+        var backupDate = DateTime.Now.AddDays(-40);
+        var lastFullBackupDate = DateTime.Now.AddDays(-45);
 
         var canDelete = policy.CanDeleteBackup(BackupType.TransactionLog, backupDate, lastFullBackupDate);
 
@@ -366,8 +366,8 @@ public class BackupPolicyTests
             _logSchedule,
             30);
 
-        var backupDate = DateTime.UtcNow.AddDays(-60);
-        var lastFullBackupDate = DateTime.UtcNow.AddDays(-45);
+        var backupDate = DateTime.Now.AddDays(-60);
+        var lastFullBackupDate = DateTime.Now.AddDays(-45);
 
         var canDelete = policy.CanDeleteBackup(BackupType.TransactionLog, backupDate, lastFullBackupDate);
 

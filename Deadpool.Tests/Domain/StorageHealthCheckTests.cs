@@ -13,7 +13,7 @@ public class StorageHealthCheckTests
         var healthCheck = new StorageHealthCheck("C:\\Backups");
 
         healthCheck.VolumePath.Should().Be("C:\\Backups");
-        healthCheck.CheckTime.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(1));
+        healthCheck.CheckTime.Should().BeCloseTo(DateTime.Now, TimeSpan.FromSeconds(1));
         healthCheck.OverallHealth.Should().Be(HealthStatus.Healthy);
         healthCheck.Warnings.Should().BeEmpty();
         healthCheck.CriticalFindings.Should().BeEmpty();

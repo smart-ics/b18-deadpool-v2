@@ -127,7 +127,7 @@ public class SqliteBackupHealthCheckRepository : IBackupHealthCheckRepository
     {
         try
         {
-            var cutoff = DateTime.UtcNow.Subtract(retention).ToString("O");
+            var cutoff = DateTime.Now.Subtract(retention).ToString("O");
 
             using var connection = new SqliteConnection(_connectionString);
             connection.Open();

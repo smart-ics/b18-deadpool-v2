@@ -14,7 +14,7 @@ public class RetentionCleanupResultTests
 
         result.DatabaseName.Should().Be("TestDB");
         result.IsDryRun.Should().BeFalse();
-        result.CleanupTime.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(1));
+        result.CleanupTime.Should().BeCloseTo(DateTime.Now, TimeSpan.FromSeconds(1));
         result.EvaluatedCount.Should().Be(0);
         result.DeletedCount.Should().Be(0);
         result.RetainedCount.Should().Be(0);

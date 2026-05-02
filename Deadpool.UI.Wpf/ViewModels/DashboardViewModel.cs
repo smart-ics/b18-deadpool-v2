@@ -381,9 +381,9 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
         return bytes / 1024m / 1024m / 1024m;
     }
 
-    private void MapAgentHeartbeat(DateTime? lastSeenUtc)
+    private void MapAgentHeartbeat(DateTime? lastSeen)
     {
-        if (!lastSeenUtc.HasValue)
+        if (!lastSeen.HasValue)
         {
             AgentStatus = "Offline";
             LastSeen = "--";
@@ -391,12 +391,12 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
             return;
         }
 
-        var age = DateTime.UtcNow - lastSeenUtc.Value;
+        var age = DateTime.Now - lastSeen.Value;
         var minutesAgo = Math.Max(0, (int)Math.Floor(age.TotalMinutes));
         var isOnline = age <= TimeSpan.FromMinutes(2);
 
         AgentStatus = isOnline ? "Online" : "Offline";
-        LastSeen = lastSeenUtc.Value.ToString("yyyy-MM-dd HH:mm:ss 'UTC'");
+        LastSeen = lastSeen.Value.ToString("yyyy-MM-dd HH:mm:ss");
         AgentStatusDisplay = isOnline
             ? "✔ Agent Online"
             : $"❌ Agent Offline (last seen {minutesAgo}m ago)";

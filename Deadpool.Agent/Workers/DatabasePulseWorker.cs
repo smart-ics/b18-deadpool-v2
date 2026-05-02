@@ -70,7 +70,7 @@ public sealed class DatabasePulseWorker : BackgroundService
 
     private async Task PerformPulseCheckAsync(CancellationToken cancellationToken)
     {
-        var checkTime = DateTime.UtcNow;
+        var checkTime = DateTime.Now;
         try
         {
             await _probe.ProbeAsync(cancellationToken);

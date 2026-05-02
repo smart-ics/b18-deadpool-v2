@@ -233,7 +233,7 @@ public partial class MonitoringDashboard : Form
         var displayJobs = recentJobs.Select(job => new
         {
             Type = GetBackupTypeLabel(job.BackupType),
-            Time = (job.EndTime ?? job.StartTime)?.ToLocalTime().ToString("HH:mm") ?? "--",
+            Time = (job.EndTime ?? job.StartTime)?.ToString("HH:mm") ?? "--",
             Status = GetJobStatusIcon(job.Status),
             RawStatus = job.Status.ToString()
         }).ToList();
@@ -352,8 +352,7 @@ public partial class MonitoringDashboard : Form
         if (!backupTime.HasValue)
             return "--";
 
-        var localTime = backupTime.Value.ToLocalTime();
-        return localTime.ToString("HH:mm");
+        return backupTime.Value.ToString("HH:mm");
     }
 
     private string FormatBytes(long bytes)
@@ -663,7 +662,7 @@ public partial class MonitoringDashboard : Form
 
         if (status.LastValidFullBackupTime.HasValue)
         {
-            var timestamp = status.LastValidFullBackupTime.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
+            var timestamp = status.LastValidFullBackupTime.Value.ToString("yyyy-MM-dd HH:mm:ss");
             var path = string.IsNullOrWhiteSpace(status.LastValidFullBackupPath)
                 ? string.Empty
                 : $" ({status.LastValidFullBackupPath})";

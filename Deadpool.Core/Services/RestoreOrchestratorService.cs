@@ -59,7 +59,7 @@ public sealed class RestoreOrchestratorService : IRestoreOrchestratorService
     {
         var databaseName = ResolveDatabaseName();
 
-        var executionStartUtc = DateTime.UtcNow;
+        var executionStart = DateTime.Now;
         RestorePlan? plan = null;
         var executionResult = new RestoreExecutionResult
         {
@@ -121,7 +121,7 @@ public sealed class RestoreOrchestratorService : IRestoreOrchestratorService
         }
         finally
         {
-            await TrySaveRestoreHistoryAsync(plan, databaseName, targetTime, executionStartUtc, executionResult);
+            await TrySaveRestoreHistoryAsync(plan, databaseName, targetTime, executionStart, executionResult);
         }
     }
 
@@ -129,18 +129,18 @@ public sealed class RestoreOrchestratorService : IRestoreOrchestratorService
         RestorePlan? plan,
         string fallbackDatabaseName,
         DateTime targetTime,
-        DateTime executionStartUtc,
+        DateTime executionStart,
         RestoreExecutionResult executionResult)
     {
         try
         {
-            var duration = DateTime.UtcNow - executionStartUtc;
+            var duration = DateTime.Now - executionStart;
             var durationMs = Math.Max(0L, (long)duration.TotalMilliseconds);
 
             var record = new RestoreHistoryRecord
             {
                 DatabaseName = plan?.DatabaseName ?? fallbackDatabaseName,
-                RestoreTimestamp = executionStartUtc,
+                RestoreTimestamp = executionStart,
                 TargetRestoreTime = plan?.TargetTime ?? targetTime,
                 FullBackupFile = plan?.FullBackup?.BackupFilePath ?? string.Empty,
                 DiffBackupFile = plan?.DifferentialBackup?.BackupFilePath,

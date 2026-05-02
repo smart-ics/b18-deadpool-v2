@@ -20,7 +20,7 @@ public class BackupFilePathService
         if (string.IsNullOrWhiteSpace(databaseName))
             throw new ArgumentException("Database name cannot be empty.", nameof(databaseName));
 
-        var timestamp = DateTime.UtcNow;
+        var timestamp = DateTime.Now;
         var backupTypeString = backupType switch
         {
             BackupType.Full => "FULL",

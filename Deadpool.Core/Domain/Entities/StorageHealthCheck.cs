@@ -18,7 +18,7 @@ public class StorageHealthCheck
         if (string.IsNullOrWhiteSpace(volumePath))
             throw new ArgumentException("Volume path cannot be empty.", nameof(volumePath));
 
-        CheckTime = DateTime.UtcNow;
+        CheckTime = DateTime.Now;
         VolumePath = volumePath;
         OverallHealth = HealthStatus.Healthy;
         Warnings = new List<string>();

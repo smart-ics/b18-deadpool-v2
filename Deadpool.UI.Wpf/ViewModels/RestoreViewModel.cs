@@ -205,9 +205,8 @@ public sealed class RestoreViewModel : INotifyPropertyChanged
         try
         {
             StatusMessage = "Generating restore plan...";
-            var targetUtc = TargetTime.ToUniversalTime();
 
-            var plan = await _planner.BuildRestorePlanAsync(DatabaseName, targetUtc);
+            var plan = await _planner.BuildRestorePlanAsync(DatabaseName, TargetTime);
             _currentPlan = plan;
             Plan = BuildPlanViewModel(plan);
 
@@ -309,7 +308,7 @@ public sealed class RestoreViewModel : INotifyPropertyChanged
             _safetyGuard.EnsureConfirmed(context);
 
             StatusMessage = "Executing restore...";
-            await _orchestrator.ExecuteRestore(TargetTime.ToUniversalTime(), context);
+            await _orchestrator.ExecuteRestore(TargetTime, context);
             StatusMessage = "Restore execution completed successfully.";
         }
         catch (Exception ex)

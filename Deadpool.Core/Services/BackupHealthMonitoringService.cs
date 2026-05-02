@@ -94,7 +94,7 @@ public class BackupHealthMonitoringService : IBackupHealthMonitoringService
 
     private async Task CheckOverdueBackupsAsync(BackupHealthCheck healthCheck, BackupPolicy policy)
     {
-        var now = DateTime.UtcNow;
+        var now = DateTime.Now;
 
         var lastFullBackup = await _repository.GetLastSuccessfulBackupAsync(
             healthCheck.DatabaseName, BackupType.Full);
@@ -111,7 +111,7 @@ public class BackupHealthMonitoringService : IBackupHealthMonitoringService
             if (fullBackupAge > _options.FullBackupOverdueThreshold)
             {
                 healthCheck.AddWarning(
-                    $"Full backup overdue. Last completed: {completionTime:yyyy-MM-dd HH:mm:ss} UTC ({fullBackupAge.TotalHours:F1}h ago).");
+                    $"Full backup overdue. Last completed: {completionTime:yyyy-MM-dd HH:mm:ss} ({fullBackupAge.TotalHours:F1}h ago).");
             }
         }
 
@@ -126,7 +126,7 @@ public class BackupHealthMonitoringService : IBackupHealthMonitoringService
             if (differentialBackupAge > _options.DifferentialBackupOverdueThreshold)
             {
                 healthCheck.AddWarning(
-                    $"Differential backup overdue. Last completed: {completionTime:yyyy-MM-dd HH:mm:ss} UTC ({differentialBackupAge.TotalHours:F1}h ago).");
+                    $"Differential backup overdue. Last completed: {completionTime:yyyy-MM-dd HH:mm:ss} ({differentialBackupAge.TotalHours:F1}h ago).");
             }
         }
 
@@ -147,7 +147,7 @@ public class BackupHealthMonitoringService : IBackupHealthMonitoringService
                 if (logBackupAge > _options.LogBackupOverdueThreshold)
                 {
                     healthCheck.AddWarning(
-                        $"Transaction log backup overdue. Last completed: {completionTime:yyyy-MM-dd HH:mm:ss} UTC ({logBackupAge.TotalMinutes:F1}m ago).");
+                        $"Transaction log backup overdue. Last completed: {completionTime:yyyy-MM-dd HH:mm:ss} ({logBackupAge.TotalMinutes:F1}m ago).");
                 }
             }
         }
@@ -155,7 +155,7 @@ public class BackupHealthMonitoringService : IBackupHealthMonitoringService
 
     private async Task CheckBackupChainHealthAsync(BackupHealthCheck healthCheck, BackupPolicy policy)
     {
-        var since = DateTime.UtcNow - _options.ChainLookbackPeriod;
+        var since = DateTime.Now - _options.ChainLookbackPeriod;
         var chain = await _repository.GetBackupChainAsync(healthCheck.DatabaseName, since);
 
         var chainList = chain.ToList();
@@ -245,12 +245,12 @@ public class BackupHealthMonitoringService : IBackupHealthMonitoringService
     {
         if (healthCheck.LastFailedBackup.HasValue)
         {
-            var failureAge = DateTime.UtcNow - healthCheck.LastFailedBackup.Value;
+            var failureAge = DateTime.Now - healthCheck.LastFailedBackup.Value;
 
             if (failureAge < TimeSpan.FromHours(24))
             {
                 healthCheck.AddWarning(
-                    $"Recent backup failure detected: {failureAge.TotalHours:F1}h ago at {healthCheck.LastFailedBackup.Value:yyyy-MM-dd HH:mm:ss} UTC");
+                    $"Recent backup failure detected: {failureAge.TotalHours:F1}h ago at {healthCheck.LastFailedBackup.Value:yyyy-MM-dd HH:mm:ss}");
             }
         }
     }

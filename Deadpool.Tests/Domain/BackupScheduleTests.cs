@@ -56,25 +56,25 @@ public class BackupScheduleTests
     [Fact]
     public void GetNextOccurrence_ShouldReturnNextScheduledTime()
     {
-        // Daily at noon UTC
+        // Daily at noon (local time)
         var schedule = new BackupSchedule("0 12 * * *");
-        var from = new DateTime(2024, 1, 1, 11, 0, 0, DateTimeKind.Utc);
+        var from = new DateTime(2024, 1, 1, 11, 0, 0, DateTimeKind.Local);
 
         var next = schedule.GetNextOccurrence(from);
 
-        next.Should().Be(new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc));
+        next.Should().Be(new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Local));
     }
 
     [Fact]
     public void GetNextOccurrence_ShouldReturnTomorrow_WhenAlreadyPastToday()
     {
-        // Daily at noon UTC
+        // Daily at noon (local time)
         var schedule = new BackupSchedule("0 12 * * *");
-        var from = new DateTime(2024, 1, 1, 13, 0, 0, DateTimeKind.Utc); // already past noon
+        var from = new DateTime(2024, 1, 1, 13, 0, 0, DateTimeKind.Local); // already past noon
 
         var next = schedule.GetNextOccurrence(from);
 
-        next.Should().Be(new DateTime(2024, 1, 2, 12, 0, 0, DateTimeKind.Utc));
+        next.Should().Be(new DateTime(2024, 1, 2, 12, 0, 0, DateTimeKind.Local));
     }
 
     [Fact]
@@ -82,12 +82,12 @@ public class BackupScheduleTests
     {
         // Cronos GetNextOccurrence is exclusive of the from value.
         var schedule = new BackupSchedule("0 12 * * *");
-        var from = new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc); // exactly noon
+        var from = new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Local); // exactly noon
 
         var next = schedule.GetNextOccurrence(from);
 
         // The very moment 12:00 is the lower bound; next occurrence is 12:00 tomorrow.
-        next.Should().Be(new DateTime(2024, 1, 2, 12, 0, 0, DateTimeKind.Utc));
+        next.Should().Be(new DateTime(2024, 1, 2, 12, 0, 0, DateTimeKind.Local));
     }
 
     // ── IsDue ───────────────────────────────────────────────────────────────────
@@ -97,8 +97,8 @@ public class BackupScheduleTests
     {
         // Runs at :00 and :15 each hour
         var schedule = new BackupSchedule("0,15 * * * *");
-        var lastCheck = new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc);
-        var now       = new DateTime(2024, 1, 1, 12, 16, 0, DateTimeKind.Utc);
+        var lastCheck = new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Local);
+        var now       = new DateTime(2024, 1, 1, 12, 16, 0, DateTimeKind.Local);
 
         schedule.IsDue(lastCheck, now).Should().BeTrue();
     }
@@ -108,8 +108,8 @@ public class BackupScheduleTests
     {
         // Daily at midnight
         var schedule = new BackupSchedule("0 0 * * *");
-        var lastCheck = new DateTime(2024, 1, 1,  1, 0, 0, DateTimeKind.Utc);
-        var now       = new DateTime(2024, 1, 1, 23, 0, 0, DateTimeKind.Utc);
+        var lastCheck = new DateTime(2024, 1, 1,  1, 0, 0, DateTimeKind.Local);
+        var now       = new DateTime(2024, 1, 1, 23, 0, 0, DateTimeKind.Local);
 
         schedule.IsDue(lastCheck, now).Should().BeFalse();
     }
@@ -119,8 +119,8 @@ public class BackupScheduleTests
     {
         // Daily at noon
         var schedule = new BackupSchedule("0 12 * * *");
-        var lastCheck = new DateTime(2024, 1, 1, 11, 59, 0, DateTimeKind.Utc);
-        var now       = new DateTime(2024, 1, 1, 12,  0, 0, DateTimeKind.Utc);
+        var lastCheck = new DateTime(2024, 1, 1, 11, 59, 0, DateTimeKind.Local);
+        var now       = new DateTime(2024, 1, 1, 12,  0, 0, DateTimeKind.Local);
 
         schedule.IsDue(lastCheck, now).Should().BeTrue();
     }
@@ -130,8 +130,8 @@ public class BackupScheduleTests
     {
         // Daily at midnight
         var schedule = new BackupSchedule("0 0 * * *");
-        var lastCheck = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc); // just fired midnight
-        var now       = new DateTime(2024, 1, 1, 6, 0, 0, DateTimeKind.Utc); // 6 hours later
+        var lastCheck = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Local); // just fired midnight
+        var now       = new DateTime(2024, 1, 1, 6, 0, 0, DateTimeKind.Local); // 6 hours later
 
         schedule.IsDue(lastCheck, now).Should().BeFalse();
     }
@@ -141,8 +141,8 @@ public class BackupScheduleTests
     {
         // Every 15 minutes; scheduler was down for 2 hours
         var schedule  = new BackupSchedule("*/15 * * * *");
-        var lastCheck = new DateTime(2024, 1, 1, 10, 0, 0, DateTimeKind.Utc);
-        var now       = new DateTime(2024, 1, 1, 12, 3, 0, DateTimeKind.Utc);
+        var lastCheck = new DateTime(2024, 1, 1, 10, 0, 0, DateTimeKind.Local);
+        var now       = new DateTime(2024, 1, 1, 12, 3, 0, DateTimeKind.Local);
 
         // Many occurrences were missed — IsDue should be true so the scheduler catches up
         schedule.IsDue(lastCheck, now).Should().BeTrue();
@@ -155,7 +155,7 @@ public class BackupScheduleTests
         // The schedule should fire as soon as its next occurrence is <= now.
         var schedule = new BackupSchedule("0 0 * * 0"); // Weekly on Sunday at midnight
         // Pick a Sunday
-        var now = new DateTime(2024, 1, 7, 1, 0, 0, DateTimeKind.Utc); // Sunday 01:00
+        var now = new DateTime(2024, 1, 7, 1, 0, 0, DateTimeKind.Local); // Sunday 01:00
 
         schedule.IsDue(DateTime.MinValue, now).Should().BeTrue();
     }

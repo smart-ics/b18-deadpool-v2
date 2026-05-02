@@ -38,7 +38,7 @@ public class RetentionCleanupResult
             throw new ArgumentException("Database name cannot be empty.", nameof(databaseName));
 
         DatabaseName = databaseName;
-        CleanupTime = DateTime.UtcNow;
+        CleanupTime = DateTime.Now;
         IsDryRun = isDryRun;
     }
 

@@ -19,7 +19,7 @@ public class BackupJobTests
         job.BackupType.Should().Be(backupType);
         job.BackupFilePath.Should().Be(backupFilePath);
         job.Status.Should().Be(BackupStatus.Pending);
-        job.StartTime.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(1));
+        job.StartTime.Should().BeCloseTo(DateTime.Now, TimeSpan.FromSeconds(1));
         job.EndTime.Should().BeNull();
         job.FileSizeBytes.Should().BeNull();
         job.ErrorMessage.Should().BeNull();
@@ -80,7 +80,7 @@ public class BackupJobTests
         job.MarkAsCompleted(1024000);
 
         job.Status.Should().Be(BackupStatus.Completed);
-        job.EndTime.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(1));
+        job.EndTime.Should().BeCloseTo(DateTime.Now, TimeSpan.FromSeconds(1));
         job.FileSizeBytes.Should().Be(1024000);
     }
 
@@ -117,7 +117,7 @@ public class BackupJobTests
         job.MarkAsFailed("Disk full");
 
         job.Status.Should().Be(BackupStatus.Failed);
-        job.EndTime.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(1));
+        job.EndTime.Should().BeCloseTo(DateTime.Now, TimeSpan.FromSeconds(1));
         job.ErrorMessage.Should().Be("Disk full");
     }
 

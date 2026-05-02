@@ -21,7 +21,7 @@ public class BackupHealthCheck
             throw new ArgumentException("Database name cannot be empty.", nameof(databaseName));
 
         DatabaseName = databaseName;
-        CheckTime = DateTime.UtcNow;
+        CheckTime = DateTime.Now;
         OverallHealth = HealthStatus.Healthy;
         Warnings = new List<string>();
         CriticalFindings = new List<string>();

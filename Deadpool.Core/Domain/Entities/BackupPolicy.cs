@@ -39,7 +39,7 @@ public class BackupPolicy
 
     public bool CanDeleteBackup(BackupType backupType, DateTime backupDate, DateTime? lastFullBackupDate)
     {
-        var cutoffDate = DateTime.UtcNow.AddDays(-RetentionDays);
+        var cutoffDate = DateTime.Now.AddDays(-RetentionDays);
 
         if (backupDate > cutoffDate)
             return false;

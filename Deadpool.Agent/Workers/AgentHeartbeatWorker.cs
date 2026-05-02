@@ -27,7 +27,7 @@ public sealed class AgentHeartbeatWorker : BackgroundService
         {
             try
             {
-                await _repository.UpsertHeartbeatAsync(DateTime.UtcNow);
+                await _repository.UpsertHeartbeatAsync(DateTime.Now);
             }
             catch (OperationCanceledException)
             {
