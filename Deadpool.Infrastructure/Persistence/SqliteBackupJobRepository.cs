@@ -201,7 +201,13 @@ public class SqliteBackupJobRepository : IBackupJobRepository
             WHERE DatabaseName = @DatabaseName
             AND BackupType = @BackupType
             AND StartTime = @StartTime
-            AND Status = @OldStatus;
+            AND Status = @OldStatus
+            AND NOT EXISTS (
+                SELECT 1
+                FROM BackupJobs r
+                WHERE r.DatabaseName = @DatabaseName
+                AND r.Status = @RunningStatus
+            );
         ";
 
         var rowsAffected = await connection.ExecuteAsync(sql, new
@@ -210,10 +216,33 @@ public class SqliteBackupJobRepository : IBackupJobRepository
             BackupType = (int)job.BackupType,
             StartTime = job.StartTime.ToString("O"),
             NewStatus = (int)BackupStatus.Running,
-            OldStatus = (int)BackupStatus.Pending
+            OldStatus = (int)BackupStatus.Pending,
+            RunningStatus = (int)BackupStatus.Running
         });
 
         return rowsAffected > 0;
+    }
+
+    public async Task<bool> HasRunningJobAsync(string databaseName)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync();
+
+        var sql = @"
+            SELECT EXISTS(
+                SELECT 1 FROM BackupJobs
+                WHERE DatabaseName = @DatabaseName
+                AND Status = @Status
+            );
+        ";
+
+        var exists = await connection.ExecuteScalarAsync<long>(sql, new
+        {
+            DatabaseName = databaseName,
+            Status = (int)BackupStatus.Running
+        });
+
+        return exists == 1;
     }
 
     public async Task<BackupJob?> GetLastSuccessfulBackupAsync(string databaseName, BackupType backupType)

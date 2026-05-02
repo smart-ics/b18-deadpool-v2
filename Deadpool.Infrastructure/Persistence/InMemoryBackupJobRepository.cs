@@ -114,6 +114,9 @@ public sealed class InMemoryBackupJobRepository : IBackupJobRepository
 
         lock (_lock)
         {
+            if (_jobs.Any(j => j.DatabaseName == job.DatabaseName && j.Status == BackupStatus.Running))
+                return Task.FromResult(false);
+
             // Check if job is still pending (another worker might have claimed it)
             if (job.Status != BackupStatus.Pending)
                 return Task.FromResult(false);
@@ -127,6 +130,18 @@ public sealed class InMemoryBackupJobRepository : IBackupJobRepository
             {
                 return Task.FromResult(false);
             }
+        }
+    }
+
+    public Task<bool> HasRunningJobAsync(string databaseName)
+    {
+        if (string.IsNullOrWhiteSpace(databaseName))
+            throw new ArgumentException("Database name cannot be empty.", nameof(databaseName));
+
+        lock (_lock)
+        {
+            var hasRunning = _jobs.Any(j => j.DatabaseName == databaseName && j.Status == BackupStatus.Running);
+            return Task.FromResult(hasRunning);
         }
     }
 

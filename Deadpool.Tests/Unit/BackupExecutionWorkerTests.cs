@@ -256,6 +256,12 @@ public class BackupExecutionWorkerTests
             return Task.FromResult(_jobs.Contains(job) && job.Status == BackupStatus.Pending);
         }
 
+        public Task<bool> HasRunningJobAsync(string databaseName)
+        {
+            var hasRunning = _jobs.Any(j => j.DatabaseName == databaseName && j.Status == BackupStatus.Running);
+            return Task.FromResult(hasRunning);
+        }
+
         public Task<BackupJob?> GetLastSuccessfulBackupAsync(string databaseName, BackupType backupType)
         {
             var job = _jobs
@@ -536,6 +542,9 @@ public class BackupExecutionWorkerTests
         {
             lock (_sync)
             {
+                if (_jobs.Any(j => j.DatabaseName == job.DatabaseName && j.Status == BackupStatus.Running))
+                    return Task.FromResult(false);
+
                 var key = $"{job.DatabaseName}:{job.BackupType}:{job.StartTime:O}";
                 if (_claimed.Contains(key))
                     return Task.FromResult(false);
@@ -544,7 +553,16 @@ public class BackupExecutionWorkerTests
                     return Task.FromResult(false);
 
                 _claimed.Add(key);
+                job.MarkAsRunning();
                 return Task.FromResult(true);
+            }
+        }
+
+        public Task<bool> HasRunningJobAsync(string databaseName)
+        {
+            lock (_sync)
+            {
+                return Task.FromResult(_jobs.Any(j => j.DatabaseName == databaseName && j.Status == BackupStatus.Running));
             }
         }
 
