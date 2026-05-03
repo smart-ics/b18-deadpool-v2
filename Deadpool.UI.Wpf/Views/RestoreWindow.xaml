@@ -285,7 +285,6 @@
                             MinWidth="180"
                             Padding="12,6"
                             Command="{Binding ExecuteRestoreCommand}"
-                            Click="OnExecuteRestoreClick"
                             Content="Execute Restore" />
 
                     <Button Grid.Column="3"

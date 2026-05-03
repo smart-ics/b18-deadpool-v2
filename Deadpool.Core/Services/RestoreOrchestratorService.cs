@@ -97,15 +97,18 @@ public sealed class RestoreOrchestratorService : IRestoreOrchestratorService
 
             _safetyGuard.EnsureConfirmed(effectiveConfirmation);
 
+            // Overwrite consent is explicitly derived from successful safety confirmation.
+            const bool allowOverwrite = true;
+
             _logger.LogInformation(
                 "Execution starting for {DatabaseName}. Steps={StepCount}, AllowOverwrite={AllowOverwrite}",
                 plan.DatabaseName,
                 plan.RestoreSequence.Count,
-                _orchestratorOptions.Value.AllowOverwrite);
+                allowOverwrite);
 
             executionResult = await _executor.ExecuteAsync(
                 plan,
-                _orchestratorOptions.Value.AllowOverwrite,
+                allowOverwrite,
                 cancellationToken);
 
             if (!executionResult.Success)
