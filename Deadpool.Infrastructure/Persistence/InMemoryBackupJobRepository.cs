@@ -59,6 +59,23 @@ public sealed class InMemoryBackupJobRepository : IBackupJobRepository
         }
     }
 
+    public Task<IEnumerable<BackupJob>> GetLatestBackupsPerTypeAsync(string databaseName)
+    {
+        if (string.IsNullOrWhiteSpace(databaseName))
+            throw new ArgumentException("Database name cannot be empty.", nameof(databaseName));
+
+        lock (_lock)
+        {
+            var latestPerType = _jobs
+                .Where(j => j.DatabaseName == databaseName)
+                .GroupBy(j => j.BackupType)
+                .Select(g => g.OrderByDescending(j => j.StartTime).First())
+                .ToList();
+
+            return Task.FromResult<IEnumerable<BackupJob>>(latestPerType);
+        }
+    }
+
     public Task<BackupJob?> GetLastSuccessfulFullBackupAsync(string databaseName)
     {
         if (string.IsNullOrWhiteSpace(databaseName))

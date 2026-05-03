@@ -182,6 +182,30 @@ public class SqliteBackupJobRepository : IBackupJobRepository
         return rows.Select(MapToBackupJob).ToList();
     }
 
+    public async Task<IEnumerable<BackupJob>> GetLatestBackupsPerTypeAsync(string databaseName)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync();
+
+        var sql = @"
+            SELECT b.*
+            FROM BackupJobs b
+            INNER JOIN (
+                SELECT BackupType, MAX(StartTime) AS MaxStartTime
+                FROM BackupJobs
+                WHERE DatabaseName = @DatabaseName
+                GROUP BY BackupType
+            ) latest
+                ON b.BackupType = latest.BackupType
+               AND b.StartTime = latest.MaxStartTime
+            WHERE b.DatabaseName = @DatabaseName
+            ORDER BY b.BackupType;
+        ";
+
+        var rows = await connection.QueryAsync<BackupJobRow>(sql, new { DatabaseName = databaseName });
+        return rows.Select(MapToBackupJob).ToList();
+    }
+
     public async Task<BackupJob?> GetLastSuccessfulFullBackupAsync(string databaseName)
     {
         return await GetLastSuccessfulBackupAsync(databaseName, BackupType.Full);

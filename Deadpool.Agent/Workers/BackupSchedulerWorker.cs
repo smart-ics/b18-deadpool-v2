@@ -64,30 +64,48 @@ public sealed class BackupSchedulerWorker : BackgroundService
     {
         foreach (var db in _databases)
         {
+            var nowUtc = DateTime.UtcNow;
+
             foreach (var (backupType, _) in db.Schedules)
             {
                 if (ct.IsCancellationRequested) return;
 
-                try
+                // default initialization for every configured type so no key remains MinValue.
+                _tracker.MarkScheduled(db.DatabaseName, backupType, nowUtc);
+            }
+
+            try
+            {
+                var latestPerType = await _jobRepository.GetLatestBackupsPerTypeAsync(db.DatabaseName);
+                var latestLookup = latestPerType
+                    .GroupBy(j => j.BackupType)
+                    .ToDictionary(g => g.Key, g => g.OrderByDescending(j => j.StartTime).First());
+
+                foreach (var (backupType, _) in db.Schedules)
                 {
-                    var recent = await _jobRepository.GetRecentJobsAsync(db.DatabaseName, count: 1);
-                    var last = recent.FirstOrDefault(j => j.BackupType == backupType);
-                    if (last != null)
+                    if (ct.IsCancellationRequested) return;
+
+                    if (!latestLookup.TryGetValue(backupType, out var last))
                     {
-                        // StartTime is local time; tracker uses UTC for Cronos comparisons.
-                        var startTimeUtc = last.StartTime.ToUniversalTime();
-                        _tracker.MarkScheduled(db.DatabaseName, backupType, startTimeUtc);
                         _logger.LogDebug(
-                            "Seeded tracker {Db}/{Type} from repository: {Time:u}",
-                            db.DatabaseName, backupType, startTimeUtc);
+                            "Seeded tracker {Db}/{Type} to startup time: {Time:u}",
+                            db.DatabaseName, backupType, nowUtc);
+                        continue;
                     }
+
+                    // Use backup completion time when present; fallback to scheduled start time.
+                    var seedUtc = (last.EndTime ?? last.StartTime).ToUniversalTime();
+                    _tracker.MarkScheduled(db.DatabaseName, backupType, seedUtc);
+                    _logger.LogDebug(
+                        "Seeded tracker {Db}/{Type} from repository: {Time:u}",
+                        db.DatabaseName, backupType, seedUtc);
                 }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex,
-                        "Could not seed tracker for {Db}/{Type}. Will re-schedule if due.",
-                        db.DatabaseName, backupType);
-                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "Could not seed tracker for {Db}. Initialized all configured types to startup time.",
+                    db.DatabaseName);
             }
         }
     }

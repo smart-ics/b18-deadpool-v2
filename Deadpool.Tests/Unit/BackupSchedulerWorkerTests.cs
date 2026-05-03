@@ -68,6 +68,8 @@ public class BackupSchedulerWorkerTests
         var m = new Mock<IBackupJobRepository>();
         m.Setup(r => r.GetRecentJobsAsync(It.IsAny<string>(), It.IsAny<int>()))
             .ReturnsAsync(Enumerable.Empty<BackupJob>());
+        m.Setup(r => r.GetLatestBackupsPerTypeAsync(It.IsAny<string>()))
+            .ReturnsAsync(Enumerable.Empty<BackupJob>());
         m.Setup(r => r.CreateAsync(It.IsAny<BackupJob>()))
             .Returns(Task.CompletedTask);
         return m;
@@ -181,7 +183,7 @@ public class BackupSchedulerWorkerTests
         var existingJob = new BackupJob("TestDB", BackupType.Full, "some_path.bak");
 
         var repo = new Mock<IBackupJobRepository>();
-        repo.Setup(r => r.GetRecentJobsAsync("TestDB", 1))
+        repo.Setup(r => r.GetLatestBackupsPerTypeAsync("TestDB"))
             .ReturnsAsync(new[] { existingJob });
         repo.Setup(r => r.CreateAsync(It.IsAny<BackupJob>()))
             .Returns(Task.CompletedTask);
@@ -244,7 +246,7 @@ public class BackupSchedulerWorkerTests
         var repo = new Mock<IBackupJobRepository>();
 
         var callCount = 0;
-        repo.Setup(r => r.GetRecentJobsAsync(It.IsAny<string>(), It.IsAny<int>()))
+        repo.Setup(r => r.GetLatestBackupsPerTypeAsync(It.IsAny<string>()))
             .ReturnsAsync(Enumerable.Empty<BackupJob>());
 
         repo.Setup(r => r.CreateAsync(It.IsAny<BackupJob>()))

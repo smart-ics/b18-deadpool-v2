@@ -222,6 +222,17 @@ public class BackupExecutionWorkerTests
             return Task.FromResult<IEnumerable<BackupJob>>(result.ToList());
         }
 
+        public Task<IEnumerable<BackupJob>> GetLatestBackupsPerTypeAsync(string databaseName)
+        {
+            var result = _jobs
+                .Where(j => j.DatabaseName == databaseName)
+                .GroupBy(j => j.BackupType)
+                .Select(g => g.OrderByDescending(j => j.StartTime).First())
+                .ToList();
+
+            return Task.FromResult<IEnumerable<BackupJob>>(result);
+        }
+
         public Task<BackupJob?> GetLastSuccessfulFullBackupAsync(string databaseName)
         {
             var job = _jobs
@@ -498,6 +509,20 @@ public class BackupExecutionWorkerTests
                     .Where(j => j.DatabaseName == databaseName)
                     .OrderByDescending(j => j.StartTime)
                     .Take(count)
+                    .ToList();
+
+                return Task.FromResult<IEnumerable<BackupJob>>(result);
+            }
+        }
+
+        public Task<IEnumerable<BackupJob>> GetLatestBackupsPerTypeAsync(string databaseName)
+        {
+            lock (_sync)
+            {
+                var result = _jobs
+                    .Where(j => j.DatabaseName == databaseName)
+                    .GroupBy(j => j.BackupType)
+                    .Select(g => g.OrderByDescending(j => j.StartTime).First())
                     .ToList();
 
                 return Task.FromResult<IEnumerable<BackupJob>>(result);

@@ -9,6 +9,7 @@ public interface IBackupJobRepository
     Task UpdateAsync(BackupJob backupJob);
     Task<BackupJob?> GetByIdAsync(int id);
     Task<IEnumerable<BackupJob>> GetRecentJobsAsync(string databaseName, int count);
+    Task<IEnumerable<BackupJob>> GetLatestBackupsPerTypeAsync(string databaseName);
     Task<BackupJob?> GetLastSuccessfulFullBackupAsync(string databaseName);
     Task<bool> HasSuccessfulFullBackupAsync(string databaseName);
 
