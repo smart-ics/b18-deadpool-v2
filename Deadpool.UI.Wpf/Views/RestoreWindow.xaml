@@ -6,10 +6,10 @@
     xmlns:views="clr-namespace:Deadpool.UI.Wpf.Views"
         mc:Ignorable="d"
         Title="Restore Database"
-        Width="980"
-        Height="620"
-        MinWidth="960"
-        MinHeight="600"
+        Width="1180"
+        Height="700"
+        MinWidth="1100"
+        MinHeight="660"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResize"
         Background="{StaticResource BackgroundBrush}">
@@ -24,10 +24,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="2*" />
-            <RowDefinition Height="2*" />
-            <RowDefinition Height="2*" />
-            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
@@ -48,274 +45,256 @@
         <Border Grid.Row="1" Style="{StaticResource CardBorderStyle}" Margin="0,0,0,10">
             <Grid>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="220" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="80" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="80" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
                 <TextBlock Grid.Column="0"
                            VerticalAlignment="Center"
-                           Margin="0,0,8,0"
+                           Margin="0,0,12,0"
                            Foreground="{StaticResource TextBrush}"
-                           Text="Target Time" />
+                           Text="Choose one valid restore point from backup history." />
 
-                <DatePicker Grid.Column="1"
-                            SelectedDate="{Binding TargetDate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-
-                <TextBlock Grid.Column="2" VerticalAlignment="Center" Margin="12,0,6,0" Foreground="{StaticResource TextBrush}" Text="Hour" />
-                <ComboBox Grid.Column="3"
-                          ItemsSource="{Binding Hours}"
-                          SelectedItem="{Binding SelectedHour, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-
-                <TextBlock Grid.Column="4" VerticalAlignment="Center" Margin="12,0,6,0" Foreground="{StaticResource TextBrush}" Text="Minute" />
-                <ComboBox Grid.Column="5"
-                          ItemsSource="{Binding Minutes}"
-                          SelectedItem="{Binding SelectedMinute, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-
-                <TextBlock Grid.Column="6"
-                           VerticalAlignment="Center"
-                           Margin="12,0,0,0"
-                           Foreground="{StaticResource MutedTextBrush}"
-                           Text="{Binding TargetTime, StringFormat=Local: {0:yyyy-MM-dd HH:mm}}" />
-
-                <Button Grid.Column="7"
-                        Margin="12,0,0,0"
-                        MinWidth="140"
+                <Button Grid.Column="1"
+                        MinWidth="160"
                         Padding="12,6"
-                        Command="{Binding GeneratePlanCommand}"
-                        Content="Generate Plan" />
+                        Command="{Binding RefreshRestorePointsCommand}"
+                        Content="Refresh Points" />
             </Grid>
         </Border>
 
-        <Border Grid.Row="2" Style="{StaticResource CardBorderStyle}" Margin="0,0,0,10">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                </Grid.RowDefinitions>
+        <Grid Grid.Row="2" Margin="0,0,0,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="2*" />
+                <ColumnDefinition Width="10" />
+                <ColumnDefinition Width="3*" />
+            </Grid.ColumnDefinitions>
 
-                <TextBlock Grid.Row="0"
-                           Margin="0,0,0,8"
-                           Style="{StaticResource PanelHeadingTextStyle}"
-                           Text="Restore Plan" />
+            <Border Grid.Column="0" Style="{StaticResource CardBorderStyle}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
 
-                <ItemsControl Grid.Row="1" ItemsSource="{Binding Plan.Steps}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <StackPanel Margin="0,0,0,4">
-                                <Border CornerRadius="6" Padding="10,8" BorderBrush="#2B3B4A" BorderThickness="1" Background="#13212C">
-                                    <Grid>
+                    <TextBlock Grid.Row="0"
+                               Style="{StaticResource PanelHeadingTextStyle}"
+                               Text="Available Restore Points" />
+
+                    <ListBox Grid.Row="1"
+                             Margin="0,8,0,0"
+                             ItemsSource="{Binding RestorePoints}"
+                             SelectedItem="{Binding SelectedRestorePoint, Mode=TwoWay}"
+                             BorderThickness="1"
+                             BorderBrush="#2B3B4A"
+                             Background="#13212C"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto">
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="IsEnabled" Value="{Binding IsSelectable}" />
+                                <Setter Property="Padding" Value="8,6" />
+                                <Setter Property="Margin" Value="0,0,0,4" />
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="90" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <TextBlock Grid.Column="0"
+                                               Text="{Binding TimeText}"
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource TextBrush}" />
+
+                                    <TextBlock Grid.Column="1"
+                                               Text="{Binding TypeText}"
+                                               Foreground="#7CC2FF"
+                                               FontWeight="Bold" />
+
+                                    <TextBlock Grid.Column="2"
+                                               Text="Unavailable"
+                                               Foreground="#D09A6E"
+                                               Visibility="{Binding IsSelectable, Converter={StaticResource InverseBoolToVisibility}}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+            </Border>
+
+            <Border Grid.Column="2" Style="{StaticResource CardBorderStyle}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0"
+                               Style="{StaticResource PanelHeadingTextStyle}"
+                               Text="Restore Plan" />
+
+                    <TextBlock Grid.Row="1"
+                               Margin="0,8,0,8"
+                               Foreground="{StaticResource MutedTextBrush}"
+                               Text="{Binding RestorePlanSummary}" />
+
+                    <Grid Grid.Row="2" Margin="0,0,0,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="90" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0"
+                                   Text="Base"
+                                   Foreground="{StaticResource MutedTextBrush}" />
+                        <TextBlock Grid.Column="1"
+                                   Text="{Binding BaseBackupSummary}"
+                                   Foreground="{StaticResource TextBrush}"
+                                   FontWeight="SemiBold" />
+                    </Grid>
+
+                    <Grid Grid.Row="3" Margin="0,0,0,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="90" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0"
+                                   Text="Logs"
+                                   Foreground="{StaticResource MutedTextBrush}" />
+                        <TextBlock Grid.Column="1"
+                                   Text="{Binding LogChainSummary}"
+                                   Foreground="{StaticResource TextBrush}"
+                                   FontWeight="SemiBold" />
+                    </Grid>
+
+                    <Grid Grid.Row="4" Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="90" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0"
+                                   Text="StopAt"
+                                   Foreground="{StaticResource MutedTextBrush}" />
+                        <TextBlock Grid.Column="1"
+                                   Text="{Binding StopAtSummary}"
+                                   Foreground="{StaticResource TextBrush}"
+                                   FontWeight="SemiBold" />
+                    </Grid>
+
+                    <Expander Grid.Row="5"
+                              IsExpanded="{Binding ShowPlanDetails, Mode=TwoWay}"
+                              Header="Details"
+                              Foreground="{StaticResource TextBrush}">
+                        <ItemsControl Margin="0,8,0,0" ItemsSource="{Binding Plan.Steps}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="0,0,0,4">
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="80" />
+                                            <ColumnDefinition Width="70" />
                                             <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="120" />
+                                            <ColumnDefinition Width="80" />
                                         </Grid.ColumnDefinitions>
 
                                         <TextBlock Grid.Column="0"
                                                    Text="{Binding StepType}"
                                                    Foreground="#7CC2FF"
-                                                   FontWeight="Bold"
-                                                   VerticalAlignment="Center" />
-
+                                                   FontWeight="Bold" />
                                         <TextBlock Grid.Column="1"
                                                    Text="{Binding DisplayName}"
                                                    Foreground="{StaticResource TextBrush}"
-                                                   TextTrimming="CharacterEllipsis"
-                                                   VerticalAlignment="Center" />
-
-                                        <Border Grid.Column="2"
-                                                CornerRadius="4"
-                                                Padding="6,2"
-                                                Background="#9A7B00"
-                                                HorizontalAlignment="Right"
-                                                Visibility="{Binding IsStopAt, Converter={StaticResource BoolToVisibility}}">
-                                            <TextBlock Text="(STOPAT)"
-                                                       FontWeight="Bold"
-                                                       Foreground="Black" />
-                                        </Border>
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Grid.Column="2"
+                                                   Text="STOPAT"
+                                                   HorizontalAlignment="Right"
+                                                   Foreground="#FFE08A"
+                                                   Visibility="{Binding IsStopAt, Converter={StaticResource BoolToVisibility}}" />
                                     </Grid>
-                                </Border>
-
-                                <TextBlock Text="↓"
-                                           HorizontalAlignment="Center"
-                                           Foreground="{StaticResource MutedTextBrush}"
-                                           FontSize="18"
-                                           Margin="0,2,0,2"
-                                           Visibility="{Binding IsLast, Converter={StaticResource InverseBoolToVisibility}}" />
-                            </StackPanel>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </Grid>
-        </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Expander>
+                </Grid>
+            </Border>
+        </Grid>
 
         <Border Grid.Row="3" Style="{StaticResource CardBorderStyle}" Margin="0,0,0,10">
             <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="120" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
 
-                <TextBlock Grid.Row="0"
-                           Style="{StaticResource PanelHeadingTextStyle}"
-                           Text="Recent Restore History" />
+                <TextBlock Grid.Column="0"
+                           Text="Status"
+                           VerticalAlignment="Top"
+                           Foreground="{StaticResource MutedTextBrush}" />
 
-                <DataGrid Grid.Row="1"
-                          Margin="0,8,0,8"
-                          Style="{StaticResource DashboardDataGridStyle}"
-                          ItemsSource="{Binding RestoreHistoryItems}"
-                          SelectedItem="{Binding SelectedHistoryItem, Mode=TwoWay}"
-                          HeadersVisibility="Column"
-                          SelectionMode="Single"
-                          SelectionUnit="FullRow">
-                    <DataGrid.Columns>
-                        <DataGridTextColumn Header="Timestamp" Binding="{Binding Timestamp, StringFormat={}{0:yyyy-MM-dd HH:mm:ss}}" Width="2*" />
-                        <DataGridTextColumn Header="Target" Binding="{Binding TargetTime, StringFormat={}{0:yyyy-MM-dd HH:mm:ss}}" Width="2*" />
-                        <DataGridTemplateColumn Header="Status" Width="*">
-                            <DataGridTemplateColumn.CellTemplate>
-                                <DataTemplate>
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <Ellipse Width="10" Height="10" Fill="{Binding StatusBrush}" Margin="0,0,6,0" />
-                                        <TextBlock Text="{Binding StatusText}" Foreground="{Binding StatusBrush}" VerticalAlignment="Center" />
-                                    </StackPanel>
-                                </DataTemplate>
-                            </DataGridTemplateColumn.CellTemplate>
-                        </DataGridTemplateColumn>
-                        <DataGridTextColumn Header="Duration" Binding="{Binding DurationText}" Width="*" />
-                        <DataGridTextColumn Header="Description" Binding="{Binding Summary}" Width="2*" />
-                    </DataGrid.Columns>
-                </DataGrid>
-
-                <Border Grid.Row="2" BorderBrush="#2B3B4A" BorderThickness="1" CornerRadius="4" Padding="8">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="8" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-
-                        <StackPanel Grid.Column="0">
-                            <TextBlock Text="Full Backup" Foreground="{StaticResource MutedTextBrush}" FontWeight="SemiBold" />
-                            <TextBlock Text="{Binding SelectedHistoryItem.FullBackupFile}" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap" Margin="0,2,0,6" />
-
-                            <TextBlock Text="Diff Backup" Foreground="{StaticResource MutedTextBrush}" FontWeight="SemiBold" />
-                            <TextBlock Text="{Binding SelectedHistoryItem.DiffBackupText}" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap" Margin="0,2,0,0" />
-                        </StackPanel>
-
-                        <StackPanel Grid.Column="2">
-                            <TextBlock Text="Log Chain" Foreground="{StaticResource MutedTextBrush}" FontWeight="SemiBold" />
-                            <TextBlock Text="{Binding SelectedHistoryItem.LogChainText}" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap" Margin="0,2,0,6" />
-
-                            <TextBlock Text="Error" Foreground="{StaticResource MutedTextBrush}" FontWeight="SemiBold" />
-                            <TextBlock Text="{Binding SelectedHistoryItem.ErrorText}" Foreground="#FF9A9A" TextWrapping="Wrap" Margin="0,2,0,0" />
-                        </StackPanel>
-                    </Grid>
-                </Border>
+                <StackPanel Grid.Column="1">
+                    <TextBlock FontWeight="Bold"
+                               Foreground="{Binding IsValid, Converter={StaticResource BoolToBrushConverter}}"
+                               Text="{Binding IsValid, Converter={StaticResource BoolToValidationTextConverter}}" />
+                    <TextBlock Margin="0,4,0,0"
+                               Text="{Binding ValidationMessage}"
+                               Foreground="{StaticResource TextBrush}"
+                               TextWrapping="Wrap"
+                               MaxHeight="44" />
+                </StackPanel>
             </Grid>
         </Border>
 
-        <Border Grid.Row="4" Style="{StaticResource CardBorderStyle}" Margin="0,0,0,10">
+        <Border Grid.Row="4" Style="{StaticResource CardBorderStyle}">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
-                <TextBlock Grid.Row="0"
-                           Style="{StaticResource PanelHeadingTextStyle}"
-                           Text="Validation" />
+                <StackPanel Grid.Row="0">
+                    <CheckBox IsChecked="{Binding IsConfirmed, Mode=TwoWay}"
+                              Foreground="{StaticResource TextBrush}"
+                              Content="I understand this operation overwrites the selected database." />
 
-                <TextBlock Grid.Row="1"
-                           Margin="0,6,0,8"
-                           FontWeight="SemiBold"
-                           Foreground="{Binding IsValid, Converter={StaticResource BoolToBrushConverter}}"
-                           Text="{Binding IsValid, Converter={StaticResource BoolToValidationTextConverter}}" />
+                    <TextBlock Margin="0,8,0,4"
+                           Foreground="{StaticResource MutedTextBrush}"
+                           Text="Type database name to confirm (required when strict text-match is enabled):" />
+                    <TextBox Text="{Binding ConfirmationText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                             IsEnabled="{Binding IsConfirmed}"
+                             MaxLength="256" />
+                </StackPanel>
 
-                <Grid Grid.Row="2">
+                <Grid Grid.Row="2" Margin="0,12,0,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="8" />
-                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
-                    <Border Grid.Column="0" BorderBrush="#AA5500" BorderThickness="1" CornerRadius="6" Padding="8">
-                        <StackPanel>
-                            <TextBlock Text="Errors" Foreground="#FF6B6B" FontWeight="Bold" Margin="0,0,0,6" />
-                            <ItemsControl ItemsSource="{Binding ValidationErrors}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <TextBlock Text="{Binding}" TextWrapping="Wrap" Foreground="#FF9A9A" Margin="0,2,0,2" />
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </StackPanel>
-                    </Border>
+                    <Button Grid.Column="1"
+                            MinWidth="180"
+                            Padding="12,6"
+                            Command="{Binding ExecuteRestoreCommand}"
+                            Content="Execute Restore" />
 
-                    <Border Grid.Column="2" BorderBrush="#8A7500" BorderThickness="1" CornerRadius="6" Padding="8">
-                        <StackPanel>
-                            <TextBlock Text="Warnings" Foreground="#FFE08A" FontWeight="Bold" Margin="0,0,0,6" />
-                            <ItemsControl ItemsSource="{Binding ValidationWarnings}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <TextBlock Text="{Binding}" TextWrapping="Wrap" Foreground="#FFF2B2" Margin="0,2,0,2" />
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </StackPanel>
-                    </Border>
+                    <Button Grid.Column="3"
+                            MinWidth="100"
+                            Padding="12,6"
+                            IsCancel="True"
+                            Click="OnCancelClick"
+                            Content="Cancel" />
                 </Grid>
             </Grid>
-        </Border>
-
-        <Border Grid.Row="5" Style="{StaticResource CardBorderStyle}" Margin="0,0,0,10">
-            <StackPanel>
-                <CheckBox IsChecked="{Binding IsConfirmed, Mode=TwoWay}"
-                          Foreground="{StaticResource TextBrush}"
-                          Content="I understand this will overwrite database" />
-
-                <TextBlock Margin="0,8,0,4"
-                           Foreground="{StaticResource MutedTextBrush}"
-                                                     Text="Type database name to confirm (required only when strict text-match is enabled):" />
-
-                <TextBox Text="{Binding ConfirmationText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                 IsEnabled="{Binding RequireTextMatch}"
-                         MaxLength="256" />
-            </StackPanel>
-        </Border>
-
-        <Grid Grid.Row="6" Margin="0,0,0,10">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="8" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-
-            <Button Grid.Column="1"
-                    MinWidth="160"
-                    Padding="12,6"
-                    Command="{Binding ExecuteRestoreCommand}"
-                    Content="Execute Restore" />
-
-            <Button Grid.Column="3"
-                    MinWidth="100"
-                    Padding="12,6"
-                    IsCancel="True"
-                    Click="OnCancelClick"
-                    Content="Cancel" />
-        </Grid>
-
-        <Border Grid.Row="7" Style="{StaticResource CardBorderStyle}">
-            <TextBlock Text="{Binding StatusMessage}"
-                       Foreground="{StaticResource TextBrush}"
-                       TextWrapping="Wrap" />
         </Border>
     </Grid>
 </Window>

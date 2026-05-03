@@ -2,7 +2,6 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
 using System.Runtime.CompilerServices;
-using System.Windows.Media;
 using Deadpool.Core.Configuration;
 using Deadpool.Core.Domain.Entities;
 using Deadpool.Core.Domain.Enums;
@@ -15,25 +14,34 @@ namespace Deadpool.UI.Wpf.ViewModels;
 
 public sealed class RestoreViewModel : INotifyPropertyChanged
 {
+    private static readonly HashSet<BackupType> RestorePointTypes = new()
+    {
+        BackupType.Full,
+        BackupType.Differential,
+        BackupType.TransactionLog
+    };
+
     private readonly IRestorePlannerService _planner;
     private readonly IRestorePlanValidatorService _validator;
     private readonly IRestoreSafetyGuard _safetyGuard;
     private readonly IRestoreOrchestratorService _orchestrator;
-    private readonly IRestoreHistoryRepository _historyRepository;
+    private readonly IBackupJobRepository _backupJobRepository;
     private readonly ILogger<RestoreViewModel> _logger;
+    private readonly Dictionary<string, (RestorePlan Plan, RestoreValidationResult Validation)> _planCache = new();
 
-    private DateTime _targetTime;
+    private RestorePointViewModel? _selectedRestorePoint;
     private RestorePlanViewModel? _plan;
     private RestoreValidationResult _validation = new();
+    private string _restorePlanSummary = "Select a restore point.";
+    private string _baseBackupSummary = "-";
+    private string _logChainSummary = "-";
+    private string _stopAtSummary = "-";
+    private bool _showPlanDetails;
     private bool _isValid;
     private bool _isConfirmed;
     private bool _requireTextMatch;
     private string _confirmationText = string.Empty;
-    private string _statusMessage = "Select target restore time and generate plan.";
-    private DateTime? _targetDate;
-    private int _selectedHour;
-    private int _selectedMinute;
-    private RestoreHistoryItem? _selectedHistoryItem;
+    private string _validationMessage = "Select a restore point to evaluate restore readiness.";
 
     private RestorePlan? _currentPlan;
 
@@ -42,7 +50,7 @@ public sealed class RestoreViewModel : INotifyPropertyChanged
         IRestorePlanValidatorService validator,
         IRestoreSafetyGuard safetyGuard,
         IRestoreOrchestratorService orchestrator,
-        IRestoreHistoryRepository historyRepository,
+        IBackupJobRepository backupJobRepository,
         IOptions<RestoreOrchestratorOptions> options,
         ILogger<RestoreViewModel> logger)
     {
@@ -50,7 +58,7 @@ public sealed class RestoreViewModel : INotifyPropertyChanged
         _validator = validator ?? throw new ArgumentNullException(nameof(validator));
         _safetyGuard = safetyGuard ?? throw new ArgumentNullException(nameof(safetyGuard));
         _orchestrator = orchestrator ?? throw new ArgumentNullException(nameof(orchestrator));
-        _historyRepository = historyRepository ?? throw new ArgumentNullException(nameof(historyRepository));
+        _backupJobRepository = backupJobRepository ?? throw new ArgumentNullException(nameof(backupJobRepository));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         DatabaseName = options.Value.DatabaseName;
@@ -59,71 +67,28 @@ public sealed class RestoreViewModel : INotifyPropertyChanged
 
         _requireTextMatch = options.Value.RequireTextMatch;
 
-        var now = DateTime.Now;
-        _targetDate = now.Date;
-        _selectedHour = now.Hour;
-        _selectedMinute = now.Minute;
-        _targetTime = new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, 59, DateTimeKind.Local);
-
-        Hours = new ObservableCollection<int>(Enumerable.Range(0, 24));
-        Minutes = new ObservableCollection<int>(Enumerable.Range(0, 60));
-
-        ValidationErrors = new ObservableCollection<string>();
-        ValidationWarnings = new ObservableCollection<string>();
-        RestoreHistoryItems = new ObservableCollection<RestoreHistoryItem>();
-
-        GeneratePlanCommand = new AsyncCommand(GeneratePlanAsync);
+        RestorePoints = new ObservableCollection<RestorePointViewModel>();
+        RefreshRestorePointsCommand = new AsyncCommand(LoadRestorePointsAsync);
         ExecuteRestoreCommand = new AsyncCommand(ExecuteRestoreAsync, CanExecuteRestore);
 
-        _ = LoadRecentHistoryAsync();
+        _ = LoadRestorePointsAsync();
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
-    public DateTime TargetTime
-    {
-        get => _targetTime;
-        private set => SetField(ref _targetTime, value);
-    }
+    public ObservableCollection<RestorePointViewModel> RestorePoints { get; }
 
-    public DateTime? TargetDate
+    public RestorePointViewModel? SelectedRestorePoint
     {
-        get => _targetDate;
+        get => _selectedRestorePoint;
         set
         {
-            if (SetField(ref _targetDate, value))
+            if (SetField(ref _selectedRestorePoint, value))
             {
-                RebuildTargetTime();
+                _ = OnSelectedRestorePointChangedAsync();
             }
         }
     }
-
-    public int SelectedHour
-    {
-        get => _selectedHour;
-        set
-        {
-            if (SetField(ref _selectedHour, value))
-            {
-                RebuildTargetTime();
-            }
-        }
-    }
-
-    public int SelectedMinute
-    {
-        get => _selectedMinute;
-        set
-        {
-            if (SetField(ref _selectedMinute, value))
-            {
-                RebuildTargetTime();
-            }
-        }
-    }
-
-    public ObservableCollection<int> Hours { get; }
-    public ObservableCollection<int> Minutes { get; }
 
     public RestorePlanViewModel? Plan
     {
@@ -135,6 +100,36 @@ public sealed class RestoreViewModel : INotifyPropertyChanged
     {
         get => _validation;
         private set => SetField(ref _validation, value);
+    }
+
+    public string RestorePlanSummary
+    {
+        get => _restorePlanSummary;
+        private set => SetField(ref _restorePlanSummary, value);
+    }
+
+    public string BaseBackupSummary
+    {
+        get => _baseBackupSummary;
+        private set => SetField(ref _baseBackupSummary, value);
+    }
+
+    public string LogChainSummary
+    {
+        get => _logChainSummary;
+        private set => SetField(ref _logChainSummary, value);
+    }
+
+    public string StopAtSummary
+    {
+        get => _stopAtSummary;
+        private set => SetField(ref _stopAtSummary, value);
+    }
+
+    public bool ShowPlanDetails
+    {
+        get => _showPlanDetails;
+        set => SetField(ref _showPlanDetails, value);
     }
 
     public bool IsValid
@@ -181,117 +176,196 @@ public sealed class RestoreViewModel : INotifyPropertyChanged
 
     public string DatabaseName { get; }
 
-    public string StatusMessage
+    public string ValidationMessage
     {
-        get => _statusMessage;
-        private set => SetField(ref _statusMessage, value);
+        get => _validationMessage;
+        private set => SetField(ref _validationMessage, value);
     }
 
-    public ObservableCollection<string> ValidationErrors { get; }
-    public ObservableCollection<string> ValidationWarnings { get; }
-    public ObservableCollection<RestoreHistoryItem> RestoreHistoryItems { get; }
-
-    public RestoreHistoryItem? SelectedHistoryItem
-    {
-        get => _selectedHistoryItem;
-        set => SetField(ref _selectedHistoryItem, value);
-    }
-
-    public AsyncCommand GeneratePlanCommand { get; }
+    public AsyncCommand RefreshRestorePointsCommand { get; }
     public AsyncCommand ExecuteRestoreCommand { get; }
 
-    private async Task GeneratePlanAsync()
+    private async Task LoadRestorePointsAsync()
     {
         try
         {
-            StatusMessage = "Generating restore plan...";
+            ValidationMessage = "Loading available restore points...";
+            _planCache.Clear();
 
-            var plan = await _planner.BuildRestorePlanAsync(DatabaseName, TargetTime);
-            _currentPlan = plan;
-            Plan = BuildPlanViewModel(plan);
+            var completedBackups = (await _backupJobRepository.GetBackupsByDatabaseAsync(DatabaseName))
+                .Where(j => j.Status == BackupStatus.Completed)
+                .Where(j => RestorePointTypes.Contains(j.BackupType))
+                .Select(j => new
+                {
+                    Backup = j,
+                    Time = GetRestorePointLocalTime(j)
+                })
+                .Where(x => x.Time.HasValue)
+                .OrderBy(x => x.Time)
+                .GroupBy(x => new { x.Backup.BackupType, Ticks = x.Time!.Value.Ticks })
+                .Select(g => g.First())
+                .ToList();
 
-            var validation = _validator.Validate(plan);
-            Validation = validation;
-            IsValid = validation.IsValid;
+            RestorePoints.Clear();
 
-            SyncValidationCollections(validation);
+            foreach (var candidate in completedBackups)
+            {
+                var targetTime = candidate.Time!.Value;
+                var cached = await GetOrCreatePlanAndValidationAsync(targetTime, candidate.Backup.BackupType);
+                var isSelectable = cached.Plan.IsValid && cached.Validation.IsValid;
 
-            StatusMessage = validation.IsValid
-                ? "Plan generated and validated. Ready for confirmation."
-                : "Plan generated, but validation failed. Resolve errors before execution.";
+                RestorePoints.Add(new RestorePointViewModel(
+                    time: targetTime,
+                    type: candidate.Backup.BackupType,
+                    isSelectable: isSelectable));
+            }
+
+            var nextSelection = RestorePoints.LastOrDefault(r => r.IsSelectable)
+                ?? RestorePoints.LastOrDefault();
+
+            SelectedRestorePoint = nextSelection;
+
+            if (nextSelection == null)
+            {
+                ResetCurrentPlanState("No completed backups available to build restore points.");
+            }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Restore plan generation failed for {DatabaseName}.", DatabaseName);
-            IsValid = false;
-            Validation = new RestoreValidationResult();
-            ValidationErrors.Clear();
-            ValidationWarnings.Clear();
-            ValidationErrors.Add(ex.Message);
-            StatusMessage = "Failed to generate restore plan.";
+            _logger.LogError(ex, "Failed to load restore points for {DatabaseName}.", DatabaseName);
+            RestorePoints.Clear();
+            SelectedRestorePoint = null;
+            ResetCurrentPlanState("Failed to load restore points.");
         }
         finally
         {
-            await LoadRecentHistoryAsync();
             RaiseCommandStates();
         }
     }
 
-    private async Task LoadRecentHistoryAsync(int limit = 10)
+    private async Task OnSelectedRestorePointChangedAsync()
     {
+        if (SelectedRestorePoint == null)
+        {
+            ResetCurrentPlanState("Select a restore point to evaluate restore readiness.");
+            RaiseCommandStates();
+            return;
+        }
+
         try
         {
-            var items = await _historyRepository.GetRecentAsync(limit);
+            var selected = SelectedRestorePoint;
+            var cached = await GetOrCreatePlanAndValidationAsync(selected.Time, selected.Type);
 
-            RestoreHistoryItems.Clear();
-            foreach (var item in items.OrderByDescending(x => x.RestoreTimestamp))
-            {
-                RestoreHistoryItems.Add(new RestoreHistoryItem(
-                    timestamp: item.RestoreTimestamp,
-                    targetTime: item.TargetRestoreTime,
-                    success: item.Success,
-                    durationMs: item.DurationMs,
-                    summary: BuildSummary(item),
-                    fullBackupFile: item.FullBackupFile,
-                    diffBackupFile: item.DiffBackupFile,
-                    logBackups: item.LogBackupFiles,
-                    errorMessage: item.ErrorMessage));
-            }
+            var plan = cached.Plan;
+            var validation = cached.Validation;
+            _currentPlan = plan;
+            Plan = BuildPlanViewModel(plan);
+            Validation = validation;
+            IsValid = plan.IsValid && validation.IsValid;
 
-            if (RestoreHistoryItems.Count > 0)
+            UpdatePlanSummary(plan, selected.Time);
+            ValidationMessage = BuildValidationMessage(plan, validation);
+
+            if (!selected.IsSelectable && IsValid)
             {
-                SelectedHistoryItem ??= RestoreHistoryItems[0];
-            }
-            else
-            {
-                SelectedHistoryItem = null;
+                selected.IsSelectable = true;
             }
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to load restore history.");
+            _logger.LogError(ex, "Failed to evaluate restore point for {DatabaseName}.", DatabaseName);
+            ResetCurrentPlanState("Failed to evaluate selected restore point.");
+        }
+        finally
+        {
+            RaiseCommandStates();
         }
     }
 
-    private static string BuildSummary(RestoreHistoryRecord record)
+    private async Task<(RestorePlan Plan, RestoreValidationResult Validation)> GetOrCreatePlanAndValidationAsync(
+        DateTime targetTime,
+        BackupType type)
     {
-        var hasDiff = !string.IsNullOrWhiteSpace(record.DiffBackupFile);
-        var logCount = record.LogBackupFiles?.Count ?? 0;
+        var key = BuildPlanCacheKey(targetTime, type);
+        if (_planCache.TryGetValue(key, out var cached))
+        {
+            return cached;
+        }
 
-        if (hasDiff)
-            return $"FULL+DIFF+{logCount} LOGs";
+        var plan = await _planner.BuildRestorePlanAsync(DatabaseName, targetTime);
+        var validation = _validator.Validate(plan);
+        var result = (plan, validation);
+        _planCache[key] = result;
+        return result;
+    }
 
-        if (logCount > 0)
-            return $"FULL+{logCount} LOGs";
+    private static string BuildPlanCacheKey(DateTime targetTime, BackupType type)
+        => $"{targetTime.Ticks}:{(int)type}";
 
-        return "FULL only";
+    private static DateTime? GetRestorePointLocalTime(BackupJob backup)
+    {
+        if (backup.EndTime.HasValue)
+            return backup.EndTime.Value.ToLocalTime();
+
+        if (backup.ExecutionStartTime.HasValue)
+            return backup.ExecutionStartTime.Value.ToLocalTime();
+
+        return null;
+    }
+
+    private void UpdatePlanSummary(RestorePlan plan, DateTime selectedPointLocal)
+    {
+        if (!plan.IsValid)
+        {
+            BaseBackupSummary = "-";
+            LogChainSummary = "-";
+            StopAtSummary = selectedPointLocal.ToString("HH:mm");
+            RestorePlanSummary = "No valid plan for selected restore point.";
+            return;
+        }
+
+        BaseBackupSummary = plan.DifferentialBackup != null ? "FULL + DIFF" : "FULL";
+        LogChainSummary = $"{plan.LogBackups.Count} file(s)";
+        StopAtSummary = selectedPointLocal.ToString("HH:mm");
+        RestorePlanSummary = $"Base: {BaseBackupSummary} | Logs: {LogChainSummary} | StopAt: {StopAtSummary}";
+    }
+
+    private static string BuildValidationMessage(RestorePlan plan, RestoreValidationResult validation)
+    {
+        if (plan.IsValid && validation.IsValid)
+            return "Ready to execute restore.";
+
+        if (validation.Errors.Count > 0)
+            return validation.Errors[0];
+
+        if (!string.IsNullOrWhiteSpace(plan.FailureReason))
+            return plan.FailureReason;
+
+        if (validation.Warnings.Count > 0)
+            return validation.Warnings[0];
+
+        return "Restore plan is invalid for the selected restore point.";
+    }
+
+    private void ResetCurrentPlanState(string validationMessage)
+    {
+        _currentPlan = null;
+        Plan = null;
+        Validation = new RestoreValidationResult();
+        IsValid = false;
+        BaseBackupSummary = "-";
+        LogChainSummary = "-";
+        StopAtSummary = "-";
+        RestorePlanSummary = "Select a restore point.";
+        ValidationMessage = validationMessage;
     }
 
     private async Task ExecuteRestoreAsync()
     {
-        if (_currentPlan == null || !IsValid)
+        if (_currentPlan == null || !IsValid || SelectedRestorePoint == null)
         {
-            StatusMessage = "Generate and validate a restore plan before execution.";
+            ValidationMessage = "Select a valid restore point before execution.";
             return;
         }
 
@@ -307,25 +381,25 @@ public sealed class RestoreViewModel : INotifyPropertyChanged
 
             _safetyGuard.EnsureConfirmed(context);
 
-            StatusMessage = "Executing restore...";
-            await _orchestrator.ExecuteRestore(TargetTime, context);
-            StatusMessage = "Restore execution completed successfully.";
+            ValidationMessage = "Executing restore...";
+            await _orchestrator.ExecuteRestore(SelectedRestorePoint.Time, context);
+            ValidationMessage = "Restore execution completed successfully.";
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Restore execution failed for {DatabaseName}.", DatabaseName);
-            StatusMessage = "Restore execution failed: " + ex.Message;
+            ValidationMessage = "Restore execution failed: " + ex.Message;
         }
         finally
         {
-            await LoadRecentHistoryAsync();
+            await LoadRestorePointsAsync();
             RaiseCommandStates();
         }
     }
 
     private bool CanExecuteRestore()
     {
-        if (!IsValid || _currentPlan == null)
+        if (!IsValid || _currentPlan == null || SelectedRestorePoint == null)
             return false;
 
         if (!IsConfirmed)
@@ -336,22 +410,11 @@ public sealed class RestoreViewModel : INotifyPropertyChanged
 
         return string.Equals(ConfirmationText, DatabaseName, StringComparison.Ordinal);
     }
-
-    private void RebuildTargetTime()
-    {
-        var date = TargetDate ?? DateTime.Now.Date;
-        TargetTime = new DateTime(
-            date.Year,
-            date.Month,
-            date.Day,
-            SelectedHour,
-            SelectedMinute,
-            0,
-            DateTimeKind.Local);
-    }
-
     private RestorePlanViewModel BuildPlanViewModel(RestorePlan plan)
     {
+        if (!plan.IsValid)
+            return new RestorePlanViewModel(Array.Empty<RestoreStepViewModel>(), plan.RequestedRestorePoint);
+
         var steps = new List<RestoreStepViewModel>();
         var hasLogs = plan.LogBackups.Count > 0;
         var stopAtAssigned = false;
@@ -426,24 +489,9 @@ public sealed class RestoreViewModel : INotifyPropertyChanged
             isLast: false);
     }
 
-    private void SyncValidationCollections(RestoreValidationResult validation)
-    {
-        ValidationErrors.Clear();
-        foreach (var error in validation.Errors)
-        {
-            ValidationErrors.Add(error);
-        }
-
-        ValidationWarnings.Clear();
-        foreach (var warning in validation.Warnings)
-        {
-            ValidationWarnings.Add(warning);
-        }
-    }
-
     private void RaiseCommandStates()
     {
-        GeneratePlanCommand.RaiseCanExecuteChanged();
+        RefreshRestorePointsCommand.RaiseCanExecuteChanged();
         ExecuteRestoreCommand.RaiseCanExecuteChanged();
     }
 
@@ -488,44 +536,42 @@ public sealed class RestoreStepViewModel
     public bool IsLast { get; }
 }
 
-public sealed class RestoreHistoryItem
+public sealed class RestorePointViewModel : INotifyPropertyChanged
 {
-    public RestoreHistoryItem(
-        DateTime timestamp,
-        DateTime targetTime,
-        bool success,
-        long durationMs,
-        string summary,
-        string fullBackupFile,
-        string? diffBackupFile,
-        IReadOnlyList<string> logBackups,
-        string? errorMessage)
+    private bool _isSelectable;
+
+    public RestorePointViewModel(DateTime time, BackupType type, bool isSelectable)
     {
-        Timestamp = timestamp;
-        TargetTime = targetTime;
-        Success = success;
-        DurationMs = durationMs;
-        Summary = summary;
-        FullBackupFile = fullBackupFile;
-        DiffBackupFile = diffBackupFile;
-        LogBackups = logBackups;
-        ErrorMessage = errorMessage;
+        Time = time;
+        Type = type;
+        _isSelectable = isSelectable;
     }
 
-    public DateTime Timestamp { get; }
-    public DateTime TargetTime { get; }
-    public bool Success { get; }
-    public long DurationMs { get; }
-    public string Summary { get; }
-    public string FullBackupFile { get; }
-    public string? DiffBackupFile { get; }
-    public IReadOnlyList<string> LogBackups { get; }
-    public string? ErrorMessage { get; }
+    public event PropertyChangedEventHandler? PropertyChanged;
 
-    public string StatusText => Success ? "Success" : "Failed";
-    public string DurationText => $"{DurationMs} ms";
-    public string LogChainText => LogBackups.Count == 0 ? "-" : string.Join(Environment.NewLine, LogBackups);
-    public string DiffBackupText => string.IsNullOrWhiteSpace(DiffBackupFile) ? "-" : DiffBackupFile;
-    public string ErrorText => string.IsNullOrWhiteSpace(ErrorMessage) ? "-" : ErrorMessage;
-    public Brush StatusBrush => Success ? Brushes.LimeGreen : Brushes.OrangeRed;
+    public DateTime Time { get; }
+    public BackupType Type { get; }
+
+    public bool IsSelectable
+    {
+        get => _isSelectable;
+        set
+        {
+            if (_isSelectable == value)
+                return;
+
+            _isSelectable = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSelectable)));
+        }
+    }
+
+    public string TimeText => Time.ToString("HH:mm");
+
+    public string TypeText => Type switch
+    {
+        BackupType.Full => "FULL",
+        BackupType.Differential => "DIFF",
+        BackupType.TransactionLog => "LOG",
+        _ => Type.ToString().ToUpperInvariant()
+    };
 }
