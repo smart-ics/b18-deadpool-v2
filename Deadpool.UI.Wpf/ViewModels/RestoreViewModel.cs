@@ -363,9 +363,22 @@ public sealed class RestoreViewModel : INotifyPropertyChanged
 
     private async Task ExecuteRestoreAsync()
     {
-        if (_currentPlan == null || !IsValid || SelectedRestorePoint == null)
+        _logger.LogInformation(
+            "Restore execute command invoked. Database={Database}, IsValid={IsValid}, Confirmed={Confirmed}, RequireTextMatch={RequireTextMatch}, SelectedPoint={SelectedPoint}",
+            DatabaseName,
+            IsValid,
+            IsConfirmed,
+            RequireTextMatch,
+            SelectedRestorePoint?.Time.ToString("O") ?? "<none>");
+
+        var executionBlockReason = GetExecutionBlockReason();
+        if (executionBlockReason != null)
         {
-            ValidationMessage = "Select a valid restore point before execution.";
+            _logger.LogWarning(
+                "Restore execution blocked for {Database}. Reason: {Reason}",
+                DatabaseName,
+                executionBlockReason);
+            ValidationMessage = executionBlockReason;
             return;
         }
 
@@ -379,10 +392,20 @@ public sealed class RestoreViewModel : INotifyPropertyChanged
                 RequireTextMatch = RequireTextMatch
             };
 
+            _logger.LogInformation(
+                "Restore command passed local checks. Calling safety guard for {Database}.",
+                DatabaseName);
             _safetyGuard.EnsureConfirmed(context);
 
             ValidationMessage = "Executing restore...";
+            _logger.LogInformation(
+                "Calling orchestrator for {Database} at target {TargetTime:o}.",
+                DatabaseName,
+                SelectedRestorePoint!.Time);
             await _orchestrator.ExecuteRestore(SelectedRestorePoint.Time, context);
+            _logger.LogInformation(
+                "Orchestrator execution completed successfully for {Database}.",
+                DatabaseName);
             ValidationMessage = "Restore execution completed successfully.";
         }
         catch (Exception ex)
@@ -399,16 +422,24 @@ public sealed class RestoreViewModel : INotifyPropertyChanged
 
     private bool CanExecuteRestore()
     {
-        if (!IsValid || _currentPlan == null || SelectedRestorePoint == null)
-            return false;
+        return GetExecutionBlockReason() == null;
+    }
+
+    private string? GetExecutionBlockReason()
+    {
+        if (SelectedRestorePoint == null)
+            return "Select a restore point before execution.";
+
+        if (_currentPlan == null || !IsValid)
+            return "Selected restore point is not valid for execution.";
 
         if (!IsConfirmed)
-            return false;
+            return "Check confirmation to enable restore execution.";
 
-        if (!RequireTextMatch)
-            return true;
+        if (RequireTextMatch && !string.Equals(ConfirmationText, DatabaseName, StringComparison.Ordinal))
+            return "Confirmation text must match the database name exactly.";
 
-        return string.Equals(ConfirmationText, DatabaseName, StringComparison.Ordinal);
+        return null;
     }
     private RestorePlanViewModel BuildPlanViewModel(RestorePlan plan)
     {

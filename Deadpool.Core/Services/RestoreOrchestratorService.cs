@@ -59,6 +59,11 @@ public sealed class RestoreOrchestratorService : IRestoreOrchestratorService
     {
         var databaseName = ResolveDatabaseName();
 
+        _logger.LogInformation(
+            "Restore orchestrator called for {DatabaseName}. TargetTime={TargetTime:o}",
+            databaseName,
+            targetTime);
+
         var executionStart = DateTime.Now;
         RestorePlan? plan = null;
         var executionResult = new RestoreExecutionResult
@@ -68,6 +73,10 @@ public sealed class RestoreOrchestratorService : IRestoreOrchestratorService
 
         try
         {
+            _logger.LogInformation(
+                "Building restore plan for {DatabaseName} at {TargetTime:o}.",
+                databaseName,
+                targetTime);
             plan = await _planner.BuildRestorePlanAsync(databaseName, targetTime);
 
             var validation = _validator.Validate(plan);
@@ -87,6 +96,12 @@ public sealed class RestoreOrchestratorService : IRestoreOrchestratorService
             };
 
             _safetyGuard.EnsureConfirmed(effectiveConfirmation);
+
+            _logger.LogInformation(
+                "Execution starting for {DatabaseName}. Steps={StepCount}, AllowOverwrite={AllowOverwrite}",
+                plan.DatabaseName,
+                plan.RestoreSequence.Count,
+                _orchestratorOptions.Value.AllowOverwrite);
 
             executionResult = await _executor.ExecuteAsync(
                 plan,

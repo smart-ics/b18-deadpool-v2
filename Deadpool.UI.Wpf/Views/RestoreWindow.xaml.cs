@@ -3,15 +3,24 @@ using System.Windows;
 using System.Windows.Data;
 using System.Windows.Media;
 using Deadpool.UI.Wpf.ViewModels;
+using Microsoft.Extensions.Logging;
 
 namespace Deadpool.UI.Wpf.Views;
 
 public partial class RestoreWindow : Window
 {
-    public RestoreWindow(RestoreViewModel viewModel)
+    private readonly ILogger<RestoreWindow> _logger;
+
+    public RestoreWindow(RestoreViewModel viewModel, ILogger<RestoreWindow> logger)
     {
         InitializeComponent();
         DataContext = viewModel;
+        _logger = logger;
+    }
+
+    private void OnExecuteRestoreClick(object sender, RoutedEventArgs e)
+    {
+        _logger.LogInformation("Execute Restore button clicked.");
     }
 
     private void OnCancelClick(object sender, RoutedEventArgs e)
