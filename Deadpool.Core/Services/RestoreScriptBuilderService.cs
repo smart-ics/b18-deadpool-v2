@@ -1,6 +1,9 @@
 using System.Globalization;
+using Deadpool.Core.Domain.Entities;
 using Deadpool.Core.Domain.ValueObjects;
 using Deadpool.Core.Interfaces;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Deadpool.Core.Services;
 
@@ -9,6 +12,13 @@ namespace Deadpool.Core.Services;
 /// </summary>
 public sealed class RestoreScriptBuilderService : IRestoreScriptBuilderService
 {
+    private readonly ILogger<RestoreScriptBuilderService> _logger;
+
+    public RestoreScriptBuilderService(ILogger<RestoreScriptBuilderService>? logger = null)
+    {
+        _logger = logger ?? NullLogger<RestoreScriptBuilderService>.Instance;
+    }
+
     public RestoreScript Build(RestorePlan plan)
     {
         ArgumentNullException.ThrowIfNull(plan);
@@ -38,8 +48,8 @@ public sealed class RestoreScriptBuilderService : IRestoreScriptBuilderService
                 commands.Add(BuildRestoreLogWithNoRecovery(databaseName, plan.LogBackups[i].BackupFilePath));
             }
 
-            var lastLogPath = plan.LogBackups.Last().BackupFilePath;
-            commands.Add(BuildFinalRestoreLogWithStopAt(databaseName, lastLogPath, plan.TargetTime));
+            var lastLog = plan.LogBackups.Last();
+            commands.Add(BuildFinalRestoreLog(databaseName, lastLog, plan.TargetTime));
         }
         else
         {
@@ -64,23 +74,55 @@ public sealed class RestoreScriptBuilderService : IRestoreScriptBuilderService
         return $"RESTORE LOG [{escapedDatabaseName}] FROM DISK = '{EscapeStringLiteral(path)}' WITH NORECOVERY;";
     }
 
-    private static string BuildFinalRestoreLogWithStopAt(string escapedDatabaseName, string path, DateTime stopAt)
+    private string BuildFinalRestoreLog(string escapedDatabaseName, BackupJob lastLog, DateTime targetTime)
     {
-        var stopAtLiteral = FormatStopAtLiteral(stopAt);
-        return $"RESTORE LOG [{escapedDatabaseName}] FROM DISK = '{EscapeStringLiteral(path)}' WITH STOPAT = '{stopAtLiteral}', RECOVERY;";
+        var normalizedStopAt = NormalizeToSqlStopAt(targetTime);
+        var normalizedStopAtLiteral = FormatStopAtLiteral(normalizedStopAt);
+
+        if (!lastLog.EndTime.HasValue)
+        {
+            _logger.LogWarning(
+                "Final restore fallback to RECOVERY without STOPAT because last log EndTime is missing. StopAt={StopAt} LastLogEndTime=<null> Comparison=unknown",
+                normalizedStopAtLiteral);
+            return BuildFinalRestoreLogWithRecoveryOnly(escapedDatabaseName, lastLog.BackupFilePath);
+        }
+
+        var normalizedLastLogEndTime = NormalizeToSqlStopAt(lastLog.EndTime.Value);
+        var normalizedLastLogEndTimeLiteral = FormatStopAtLiteral(normalizedLastLogEndTime);
+        var comparison = normalizedStopAt.CompareTo(normalizedLastLogEndTime);
+        var clampedStopAt = comparison > 0 ? normalizedLastLogEndTime : normalizedStopAt;
+        var clampedStopAtLiteral = FormatStopAtLiteral(clampedStopAt);
+
+        _logger.LogInformation(
+            "Final restore STOPAT evaluation. StopAt={StopAt} LastLogEndTime={LastLogEndTime} Comparison={Comparison} ClampedStopAt={ClampedStopAt}",
+            normalizedStopAtLiteral,
+            normalizedLastLogEndTimeLiteral,
+            comparison,
+            clampedStopAtLiteral);
+
+        // At or beyond the final log boundary, STOPAT is not required and recovery-only is safer.
+        if (clampedStopAt >= normalizedLastLogEndTime)
+        {
+            return BuildFinalRestoreLogWithRecoveryOnly(escapedDatabaseName, lastLog.BackupFilePath);
+        }
+
+        return $"RESTORE LOG [{escapedDatabaseName}] FROM DISK = '{EscapeStringLiteral(lastLog.BackupFilePath)}' WITH STOPAT = '{clampedStopAtLiteral}', RECOVERY;";
+    }
+
+    private static string BuildFinalRestoreLogWithRecoveryOnly(string escapedDatabaseName, string path)
+    {
+        return $"RESTORE LOG [{escapedDatabaseName}] FROM DISK = '{EscapeStringLiteral(path)}' WITH RECOVERY;";
+    }
+
+    private static DateTime NormalizeToSqlStopAt(DateTime value)
+    {
+        var utc = value.Kind == DateTimeKind.Utc ? value : value.ToUniversalTime();
+        return new DateTime(utc.Year, utc.Month, utc.Day, utc.Hour, utc.Minute, utc.Second, DateTimeKind.Unspecified);
     }
 
     private static string FormatStopAtLiteral(DateTime stopAt)
     {
-        // Preserve sub-second precision and include explicit offset context for deterministic point-in-time restore.
-        var normalized = stopAt.Kind switch
-        {
-            DateTimeKind.Utc => new DateTimeOffset(stopAt, TimeSpan.Zero),
-            DateTimeKind.Local => new DateTimeOffset(stopAt),
-            _ => new DateTimeOffset(DateTime.SpecifyKind(stopAt, DateTimeKind.Utc), TimeSpan.Zero)
-        };
-
-        return normalized.ToString("yyyy-MM-ddTHH:mm:ss.fffffffK", CultureInfo.InvariantCulture);
+        return stopAt.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
     }
 
     private static string EscapeIdentifier(string value)

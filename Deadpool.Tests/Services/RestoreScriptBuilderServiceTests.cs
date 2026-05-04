@@ -83,11 +83,12 @@ public class RestoreScriptBuilderServiceTests
     [Fact]
     public void Build_FullAndLogs_GeneratesFinalLogWithStopAtRecoveryOnly()
     {
-        var targetTime = DateTime.Parse("2026-05-02T14:35:00.1234567Z").ToUniversalTime();
+        var baseTime = DateTime.Parse("2026-05-02T16:00:00.0000000Z").ToUniversalTime();
+        var targetTime = DateTime.Parse("2026-05-02T14:45:00.1234567Z").ToUniversalTime();
 
-        var full = CreateCompletedFullBackup(@"C:\Backups\full.bak", targetTime.AddHours(-4));
-        var log1 = CreateCompletedLogBackup(@"C:\Backups\log1.trn", targetTime.AddHours(-2), full.LastLSN!.Value);
-        var log2 = CreateCompletedLogBackup(@"C:\Backups\log2.trn", targetTime.AddHours(-1), log1.LastLSN!.Value);
+        var full = CreateCompletedFullBackup(@"C:\Backups\full.bak", baseTime.AddHours(-4));
+        var log1 = CreateCompletedLogBackup(@"C:\Backups\log1.trn", baseTime.AddHours(-2), full.LastLSN!.Value);
+        var log2 = CreateCompletedLogBackup(@"C:\Backups\log2.trn", baseTime.AddHours(-1), log1.LastLSN!.Value);
 
         var plan = RestorePlan.CreateValidPlan(
             "TestDB",
@@ -103,7 +104,7 @@ public class RestoreScriptBuilderServiceTests
         script.Commands[0].Should().Be("USE master;");
         script.Commands[1].Should().Be("RESTORE DATABASE [TestDB] FROM DISK = 'C:\\Backups\\full.bak' WITH NORECOVERY;");
         script.Commands[2].Should().Be("RESTORE LOG [TestDB] FROM DISK = 'C:\\Backups\\log1.trn' WITH NORECOVERY;");
-        script.Commands[3].Should().Be("RESTORE LOG [TestDB] FROM DISK = 'C:\\Backups\\log2.trn' WITH STOPAT = '2026-05-02T14:35:00.1234567+00:00', RECOVERY;");
+        script.Commands[3].Should().Be("RESTORE LOG [TestDB] FROM DISK = 'C:\\Backups\\log2.trn' WITH STOPAT = '2026-05-02 14:45:00', RECOVERY;");
 
         script.Commands[1].Should().NotContain("STOPAT");
         script.Commands[1].Should().Contain("WITH NORECOVERY;");
@@ -115,12 +116,13 @@ public class RestoreScriptBuilderServiceTests
     [Fact]
     public void Build_FullDiffLogs_UsesStrictOrder()
     {
-        var targetTime = DateTime.UtcNow;
+        var baseTime = DateTime.Parse("2026-05-02T16:00:00.0000000Z").ToUniversalTime();
+        var targetTime = DateTime.Parse("2026-05-02T14:45:00.0000000Z").ToUniversalTime();
 
-        var full = CreateCompletedFullBackup(@"C:\Backups\full.bak", targetTime.AddHours(-6));
-        var diff = CreateCompletedDifferentialBackup(@"C:\Backups\diff.bak", targetTime.AddHours(-4), full.CheckpointLSN!.Value);
-        var log1 = CreateCompletedLogBackup(@"C:\Backups\log1.trn", targetTime.AddHours(-2), diff.LastLSN!.Value);
-        var log2 = CreateCompletedLogBackup(@"C:\Backups\log2.trn", targetTime.AddHours(-1), log1.LastLSN!.Value);
+        var full = CreateCompletedFullBackup(@"C:\Backups\full.bak", baseTime.AddHours(-6));
+        var diff = CreateCompletedDifferentialBackup(@"C:\Backups\diff.bak", baseTime.AddHours(-4), full.CheckpointLSN!.Value);
+        var log1 = CreateCompletedLogBackup(@"C:\Backups\log1.trn", baseTime.AddHours(-2), diff.LastLSN!.Value);
+        var log2 = CreateCompletedLogBackup(@"C:\Backups\log2.trn", baseTime.AddHours(-1), log1.LastLSN!.Value);
 
         var plan = RestorePlan.CreateValidPlan(
             "TestDB",
@@ -141,6 +143,62 @@ public class RestoreScriptBuilderServiceTests
         CountRecoveryClauses(script).Should().Be(1);
         script.Commands.Last().Should().Contain("RECOVERY;");
         script.Commands.Last().Should().NotContain("NORECOVERY");
+    }
+
+    [Fact]
+    public void Build_TargetAtOrBeyondLastLogEnd_UsesRecoveryWithoutStopAt()
+    {
+        var targetTime = DateTime.Parse("2026-05-02T14:35:00.9000000Z").ToUniversalTime();
+        var full = CreateCompletedFullBackup(@"C:\Backups\full.bak", targetTime.AddHours(-4));
+        var log1 = CreateCompletedLogBackup(@"C:\Backups\log1.trn", targetTime.AddHours(-2), full.LastLSN!.Value);
+        var log2 = CreateCompletedLogBackup(@"C:\Backups\log2.trn", targetTime.AddHours(-1), log1.LastLSN!.Value);
+
+        var plan = RestorePlan.CreateValidPlan(
+            "TestDB",
+            targetTime.AddMinutes(30),
+            full,
+            differentialBackup: null,
+            logBackups: new List<BackupJob> { log1, log2 },
+            actualRestorePoint: targetTime);
+
+        var script = _service.Build(plan);
+
+        script.Commands.Last().Should().Be("RESTORE LOG [TestDB] FROM DISK = 'C:\\Backups\\log2.trn' WITH RECOVERY;");
+        script.Commands.Last().Should().NotContain("STOPAT");
+    }
+
+    [Fact]
+    public void Build_LastLogWithoutEndTime_UsesRecoveryWithoutStopAt()
+    {
+        var targetTime = DateTime.UtcNow;
+        var full = CreateCompletedFullBackup(@"C:\Backups\full.bak", targetTime.AddHours(-4));
+        var log1 = CreateCompletedLogBackup(@"C:\Backups\log1.trn", targetTime.AddHours(-2), full.LastLSN!.Value);
+        var log2 = BackupJob.Restore(
+            "TestDB",
+            BackupType.TransactionLog,
+            BackupStatus.Completed,
+            targetTime.AddHours(-1),
+            null,
+            @"C:\Backups\log2.trn",
+            1024 * 1024 * 10,
+            null,
+            log1.LastLSN!.Value,
+            log1.LastLSN.Value + 50m,
+            null,
+            null);
+
+        var plan = RestorePlan.CreateValidPlan(
+            "TestDB",
+            targetTime,
+            full,
+            differentialBackup: null,
+            logBackups: new List<BackupJob> { log1, log2 },
+            actualRestorePoint: targetTime);
+
+        var script = _service.Build(plan);
+
+        script.Commands.Last().Should().Be("RESTORE LOG [TestDB] FROM DISK = 'C:\\Backups\\log2.trn' WITH RECOVERY;");
+        script.Commands.Last().Should().NotContain("STOPAT");
     }
 
     [Fact]
