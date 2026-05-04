@@ -14,17 +14,17 @@ Deadpool Backup Tools is an enterprise-grade SQL Server backup and disaster reco
 
 ## ✨ Key Features
 
-### Phase 1 (Current)
+### Phase 1 (Done)
 - ✅ **Automated Backup Scheduling** - Cron-based full, differential, and transaction log backups
 - ✅ **Health Monitoring** - Continuous monitoring of backup status and SQL Server health
 - ✅ **Windows Service Agent** - Background processing with retry logic and logging
 - ✅ **Windows Forms UI** - Desktop application for configuration and monitoring
 - ✅ **Production-Grade Architecture** - DDD-Lite clean architecture with Result pattern
 
-### Phase 2 (Planned)
-- 🔲 **One-Click Restore** - Automated backup chain validation and restore sequencing
-- 🔲 **Point-in-Time Recovery** - Calculate and restore to specific timestamps
-- 🔲 **Restore Preview** - Show required backup files before restore
+### Phase 2 (Current)
+- ✅ **One-Click Restore** - Automated backup chain validation and restore sequencing
+- ✅ **Point-in-Time Recovery** - Calculate and restore to specific timestamps
+- ✅ **Restore Preview** - Show required backup files before restore
 
 ### Phase 3 (Future)
 - 🔲 **Auto Recovery** - Detect and automatically recover failed databases
