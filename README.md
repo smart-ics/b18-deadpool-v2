@@ -4,27 +4,27 @@
 
 [![.NET 8.0](https://img.shields.io/badge/.NET-8.0-512BD4)](https://dotnet.microsoft.com/)
 [![License](https://img.shields.io/badge/license-Proprietary-red)](LICENSE)
-[![Status](https://img.shields.io/badge/status-Phase%201%20Development-yellow)](docs/TASKS.md)
+[![Status](https://img.shields.io/badge/status-Phase%202%20Development-yellow)](docs/TASKS.md)
 
 ## 🎯 Overview
 
 Deadpool Backup Tools is an enterprise-grade SQL Server backup and disaster recovery platform designed specifically for hospital IT environments. It provides automated backup scheduling, health monitoring, and (in Phase 2) one-click restore capabilities—all while maintaining HIPAA compliance and reliability standards.
 
-**Current Status:** Phase 1 Development (Backup & Monitoring)
+**Current Status:** Phase 2 Development (One-Click Restore)
 
 ## ✨ Key Features
 
-### Phase 1 (Current)
+### Phase 1 (Done)
 - ✅ **Automated Backup Scheduling** - Cron-based full, differential, and transaction log backups
 - ✅ **Health Monitoring** - Continuous monitoring of backup status and SQL Server health
 - ✅ **Windows Service Agent** - Background processing with retry logic and logging
 - ✅ **Windows Forms UI** - Desktop application for configuration and monitoring
 - ✅ **Production-Grade Architecture** - DDD-Lite clean architecture with Result pattern
 
-### Phase 2 (Planned)
-- 🔲 **One-Click Restore** - Automated backup chain validation and restore sequencing
-- 🔲 **Point-in-Time Recovery** - Calculate and restore to specific timestamps
-- 🔲 **Restore Preview** - Show required backup files before restore
+### Phase 2 (Current)
+- ✅ **One-Click Restore** - Automated backup chain validation and restore sequencing
+- ✅ **Point-in-Time Recovery** - Calculate and restore to specific timestamps
+- ✅ **Restore Preview** - Show required backup files before restore
 
 ### Phase 3 (Future)
 - 🔲 **Auto Recovery** - Detect and automatically recover failed databases
@@ -37,34 +37,34 @@ Deadpool follows **DDD-Lite Clean Architecture** principles for maintainability 
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                     Presentation Layer                   │
+│                     Presentation Layer                  │
 │  ┌─────────────────┐              ┌─────────────────┐   │
 │  │  Deadpool.UI    │              │  Deadpool.Agent │   │
-│  │   (WinForms)    │              │ (Worker Service)│   │
+│  │   (WPF     )    │              │ (Worker Service)│   │
 │  └────────┬────────┘              └────────┬────────┘   │
 └───────────┼─────────────────────────────────┼───────────┘
             │                                 │
 ┌───────────┴─────────────────────────────────┴───────────┐
-│                   Application Layer                      │
+│                   Application Layer                     │
 │  ┌──────────────────────────────────────────────────┐   │
-│  │            Deadpool.Core                          │   │
-│  │  • Domain Entities (SqlServerInstance, Database,  │   │
-│  │    BackupJob, BackupSchedule)                     │   │
-│  │  • Repository Interfaces                          │   │
-│  │  • Service Interfaces                             │   │
+│  │            Deadpool.Core                         │   │
+│  │  • Domain Entities (SqlServerInstance, Database, │   │
+│  │    BackupJob, BackupSchedule)                    │   │
+│  │  • Repository Interfaces                         │   │
+│  │  • Service Interfaces                            │   │
 │  └──────────────────────────────────────────────────┘   │
-└──────────────────────────┬───────────────────────────────┘
+└──────────────────────────┬──────────────────────────────┘
                            │
 ┌──────────────────────────┴───────────────────────────────┐
-│                  Infrastructure Layer                     │
-│  ┌──────────────────────────────────────────────────┐   │
+│                  Infrastructure Layer                    │
+│  ┌───────────────────────────────────────────────────┐   │
 │  │        Deadpool.Infrastructure                    │   │
 │  │  • Dapper Repositories (SqlServerInstanceRepo,    │   │
 │  │    DatabaseRepo, BackupJobRepo, etc.)             │   │
 │  │  • SQL Server Services (BackupExecution,          │   │
 │  │    Monitoring, Scheduler)                         │   │
-│  └──────────────────────────────────────────────────┘   │
-└───────────────────────────────────────────────────────────┘
+│  └───────────────────────────────────────────────────┘   │
+└──────────────────────────────────────────────────────────┘
 ```
 
 **Technology Stack:**
