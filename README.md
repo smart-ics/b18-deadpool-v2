@@ -10,7 +10,7 @@
 
 Deadpool Backup Tools is an enterprise-grade SQL Server backup and disaster recovery platform designed specifically for hospital IT environments. It provides automated backup scheduling, health monitoring, and (in Phase 2) one-click restore capabilities—all while maintaining HIPAA compliance and reliability standards.
 
-**Current Status:** Phase 1 Development (Backup & Monitoring)
+**Current Status:** Phase 2 Development (One-Click Restore)
 
 ## ✨ Key Features
 
