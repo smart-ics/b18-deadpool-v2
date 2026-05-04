@@ -24,12 +24,35 @@ public class RestoreScriptBuilderServiceTests
 
         var script = _service.Build(plan);
 
-        script.Commands.Should().HaveCount(2);
-        script.Commands[0].Should().Be("RESTORE DATABASE [TestDB] FROM DISK = 'C:\\Backups\\full.bak' WITH NORECOVERY;");
-        script.Commands[1].Should().Be("RESTORE DATABASE [TestDB] WITH RECOVERY;");
+        script.Commands.Should().HaveCount(3);
+        script.Commands[0].Should().Be("USE master;");
+        script.Commands[1].Should().Be("RESTORE DATABASE [TestDB] FROM DISK = 'C:\\Backups\\full.bak' WITH NORECOVERY;");
+        script.Commands[2].Should().Be("RESTORE DATABASE [TestDB] WITH RECOVERY;");
         CountRecoveryClauses(script).Should().Be(1);
         script.Commands.Last().Should().Contain(" WITH RECOVERY;");
         script.ToSql().Should().Contain("RESTORE DATABASE [TestDB] FROM DISK");
+    }
+
+    [Fact]
+    public void Build_FullOnlyWithAllowOverwrite_IncludesReplaceOnFullRestore()
+    {
+        var full = CreateCompletedFullBackup(@"C:\Backups\full.bak", DateTime.UtcNow.AddHours(-2));
+        var plan = RestorePlan.CreateValidPlan(
+            "TestDB",
+            full.EndTime!.Value,
+            full,
+            differentialBackup: null,
+            logBackups: Array.Empty<BackupJob>(),
+            actualRestorePoint: full.EndTime.Value,
+            allowOverwrite: true);
+
+        var script = _service.Build(plan);
+
+        script.Commands.Should().HaveCount(3);
+        script.Commands[0].Should().Be("USE master;");
+        script.Commands[1].Should().Be("RESTORE DATABASE [TestDB] FROM DISK = 'C:\\Backups\\full.bak' WITH NORECOVERY, REPLACE;");
+        script.Commands[2].Should().Be("RESTORE DATABASE [TestDB] WITH RECOVERY;");
+        script.Commands[1].Should().Contain("REPLACE;");
     }
 
     [Fact]
@@ -48,10 +71,11 @@ public class RestoreScriptBuilderServiceTests
 
         var script = _service.Build(plan);
 
-        script.Commands.Should().HaveCount(3);
-        script.Commands[0].Should().Be("RESTORE DATABASE [TestDB] FROM DISK = 'C:\\Backups\\full.bak' WITH NORECOVERY;");
-        script.Commands[1].Should().Be("RESTORE DATABASE [TestDB] FROM DISK = 'C:\\Backups\\diff.bak' WITH NORECOVERY;");
-        script.Commands[2].Should().Be("RESTORE DATABASE [TestDB] WITH RECOVERY;");
+        script.Commands.Should().HaveCount(4);
+        script.Commands[0].Should().Be("USE master;");
+        script.Commands[1].Should().Be("RESTORE DATABASE [TestDB] FROM DISK = 'C:\\Backups\\full.bak' WITH NORECOVERY;");
+        script.Commands[2].Should().Be("RESTORE DATABASE [TestDB] FROM DISK = 'C:\\Backups\\diff.bak' WITH NORECOVERY;");
+        script.Commands[3].Should().Be("RESTORE DATABASE [TestDB] WITH RECOVERY;");
         CountRecoveryClauses(script).Should().Be(1);
         script.Commands.Last().Should().Contain(" WITH RECOVERY;");
     }
@@ -75,10 +99,11 @@ public class RestoreScriptBuilderServiceTests
 
         var script = _service.Build(plan);
 
-        script.Commands.Should().HaveCount(3);
-        script.Commands[0].Should().Be("RESTORE DATABASE [TestDB] FROM DISK = 'C:\\Backups\\full.bak' WITH NORECOVERY;");
-        script.Commands[1].Should().Be("RESTORE LOG [TestDB] FROM DISK = 'C:\\Backups\\log1.trn' WITH NORECOVERY;");
-        script.Commands[2].Should().Be("RESTORE LOG [TestDB] FROM DISK = 'C:\\Backups\\log2.trn' WITH STOPAT = '2026-05-02T14:35:00.1234567+00:00', RECOVERY;");
+        script.Commands.Should().HaveCount(4);
+        script.Commands[0].Should().Be("USE master;");
+        script.Commands[1].Should().Be("RESTORE DATABASE [TestDB] FROM DISK = 'C:\\Backups\\full.bak' WITH NORECOVERY;");
+        script.Commands[2].Should().Be("RESTORE LOG [TestDB] FROM DISK = 'C:\\Backups\\log1.trn' WITH NORECOVERY;");
+        script.Commands[3].Should().Be("RESTORE LOG [TestDB] FROM DISK = 'C:\\Backups\\log2.trn' WITH STOPAT = '2026-05-02T14:35:00.1234567+00:00', RECOVERY;");
 
         script.Commands[1].Should().NotContain("STOPAT");
         script.Commands[1].Should().Contain("WITH NORECOVERY;");
@@ -107,11 +132,12 @@ public class RestoreScriptBuilderServiceTests
 
         var script = _service.Build(plan);
 
-        script.Commands.Should().HaveCount(4);
-        script.Commands[0].Should().Contain("RESTORE DATABASE [TestDB] FROM DISK = 'C:\\Backups\\full.bak' WITH NORECOVERY;");
-        script.Commands[1].Should().Contain("RESTORE DATABASE [TestDB] FROM DISK = 'C:\\Backups\\diff.bak' WITH NORECOVERY;");
-        script.Commands[2].Should().Contain("RESTORE LOG [TestDB] FROM DISK = 'C:\\Backups\\log1.trn' WITH NORECOVERY;");
-        script.Commands[3].Should().Contain("RESTORE LOG [TestDB] FROM DISK = 'C:\\Backups\\log2.trn' WITH STOPAT = '");
+        script.Commands.Should().HaveCount(5);
+        script.Commands[0].Should().Be("USE master;");
+        script.Commands[1].Should().Contain("RESTORE DATABASE [TestDB] FROM DISK = 'C:\\Backups\\full.bak' WITH NORECOVERY;");
+        script.Commands[2].Should().Contain("RESTORE DATABASE [TestDB] FROM DISK = 'C:\\Backups\\diff.bak' WITH NORECOVERY;");
+        script.Commands[3].Should().Contain("RESTORE LOG [TestDB] FROM DISK = 'C:\\Backups\\log1.trn' WITH NORECOVERY;");
+        script.Commands[4].Should().Contain("RESTORE LOG [TestDB] FROM DISK = 'C:\\Backups\\log2.trn' WITH STOPAT = '");
         CountRecoveryClauses(script).Should().Be(1);
         script.Commands.Last().Should().Contain("RECOVERY;");
         script.Commands.Last().Should().NotContain("NORECOVERY");
@@ -142,8 +168,9 @@ public class RestoreScriptBuilderServiceTests
 
         var script = _service.Build(plan);
 
-        script.Commands[0].Should().Contain("[Db]]Name]");
-        script.Commands[0].Should().Contain("fi''le.bak");
+        script.Commands[0].Should().Be("USE master;");
+        script.Commands[1].Should().Contain("[Db]]Name]");
+        script.Commands[1].Should().Contain("fi''le.bak");
     }
 
     private static BackupJob CreateCompletedFullBackup(string path, DateTime startTime)

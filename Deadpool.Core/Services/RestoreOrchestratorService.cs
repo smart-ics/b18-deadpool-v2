@@ -77,7 +77,7 @@ public sealed class RestoreOrchestratorService : IRestoreOrchestratorService
                 "Building restore plan for {DatabaseName} at {TargetTime:o}.",
                 databaseName,
                 targetTime);
-            plan = await _planner.BuildRestorePlanAsync(databaseName, targetTime);
+            plan = await _planner.BuildRestorePlanAsync(databaseName, targetTime, confirmationContext.Confirmed);
 
             var validation = _validator.Validate(plan);
             if (!validation.IsValid)
@@ -97,8 +97,7 @@ public sealed class RestoreOrchestratorService : IRestoreOrchestratorService
 
             _safetyGuard.EnsureConfirmed(effectiveConfirmation);
 
-            // Overwrite consent is explicitly derived from successful safety confirmation.
-            const bool allowOverwrite = true;
+            var allowOverwrite = confirmationContext.Confirmed;
 
             _logger.LogInformation(
                 "Execution starting for {DatabaseName}. Steps={StepCount}, AllowOverwrite={AllowOverwrite}",

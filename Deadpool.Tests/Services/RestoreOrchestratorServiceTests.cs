@@ -26,7 +26,7 @@ public class RestoreOrchestratorServiceTests
         var plan = BuildValidPlan(targetTime);
 
         _plannerMock
-            .Setup(p => p.BuildRestorePlanAsync("TestDB", targetTime))
+            .Setup(p => p.BuildRestorePlanAsync("TestDB", targetTime, true))
             .ReturnsAsync(plan);
 
         var validation = new RestoreValidationResult();
@@ -69,7 +69,7 @@ public class RestoreOrchestratorServiceTests
         var plan = BuildValidPlan(targetTime);
 
         _plannerMock
-            .Setup(p => p.BuildRestorePlanAsync("TestDB", targetTime))
+            .Setup(p => p.BuildRestorePlanAsync("TestDB", targetTime, true))
             .ReturnsAsync(plan);
 
         _validatorMock
@@ -87,7 +87,7 @@ public class RestoreOrchestratorServiceTests
 
         await sut.ExecuteRestore(targetTime);
 
-        _plannerMock.Verify(p => p.BuildRestorePlanAsync("TestDB", targetTime), Times.Once);
+        _plannerMock.Verify(p => p.BuildRestorePlanAsync("TestDB", targetTime, true), Times.Once);
         _validatorMock.Verify(v => v.Validate(plan), Times.Once);
         _safetyGuardMock.Verify(
             s => s.EnsureConfirmed(It.Is<RestoreConfirmationContext>(c =>
@@ -118,7 +118,7 @@ public class RestoreOrchestratorServiceTests
         var plan = BuildValidPlan(targetTime);
 
         _plannerMock
-            .Setup(p => p.BuildRestorePlanAsync("TestDB", targetTime))
+            .Setup(p => p.BuildRestorePlanAsync("TestDB", targetTime, true))
             .ReturnsAsync(plan);
 
         _validatorMock
@@ -157,7 +157,7 @@ public class RestoreOrchestratorServiceTests
         var plan = BuildValidPlan(targetTime);
 
         _plannerMock
-            .Setup(p => p.BuildRestorePlanAsync("TestDB", targetTime))
+            .Setup(p => p.BuildRestorePlanAsync("TestDB", targetTime, true))
             .ReturnsAsync(plan);
 
         _validatorMock
@@ -191,7 +191,7 @@ public class RestoreOrchestratorServiceTests
         var plan = BuildValidPlan(targetTime);
 
         _plannerMock
-            .Setup(p => p.BuildRestorePlanAsync("TestDB", targetTime))
+            .Setup(p => p.BuildRestorePlanAsync("TestDB", targetTime, true))
             .ReturnsAsync(plan);
 
         _validatorMock
@@ -224,7 +224,7 @@ public class RestoreOrchestratorServiceTests
         var plan = BuildValidPlan(targetTime);
 
         _plannerMock
-            .Setup(p => p.BuildRestorePlanAsync("TestDB", targetTime))
+            .Setup(p => p.BuildRestorePlanAsync("TestDB", targetTime, true))
             .ReturnsAsync(plan);
 
         _validatorMock
@@ -282,7 +282,7 @@ public class RestoreOrchestratorServiceTests
         var targetTime = DateTime.UtcNow;
 
         _plannerMock
-            .Setup(p => p.BuildRestorePlanAsync("TestDB", targetTime))
+            .Setup(p => p.BuildRestorePlanAsync("TestDB", targetTime, true))
             .ThrowsAsync(new InvalidOperationException("Planner source unavailable"));
 
         var sut = CreateSut();

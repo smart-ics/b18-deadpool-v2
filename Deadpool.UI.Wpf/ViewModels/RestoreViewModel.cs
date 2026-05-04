@@ -65,6 +65,7 @@ public sealed class RestoreViewModel : INotifyPropertyChanged
         if (string.IsNullOrWhiteSpace(DatabaseName))
             DatabaseName = "UNKNOWN";
 
+        AllowOverwrite = options.Value.AllowOverwrite;
         _requireTextMatch = options.Value.RequireTextMatch;
 
         RestorePoints = new ObservableCollection<RestorePointViewModel>();
@@ -175,6 +176,7 @@ public sealed class RestoreViewModel : INotifyPropertyChanged
     }
 
     public string DatabaseName { get; }
+    public bool AllowOverwrite { get; }
 
     public string ValidationMessage
     {
@@ -293,7 +295,7 @@ public sealed class RestoreViewModel : INotifyPropertyChanged
             return cached;
         }
 
-        var plan = await _planner.BuildRestorePlanAsync(DatabaseName, targetTime);
+        var plan = await _planner.BuildRestorePlanAsync(DatabaseName, targetTime, AllowOverwrite);
         var validation = _validator.Validate(plan);
         var result = (plan, validation);
         _planCache[key] = result;

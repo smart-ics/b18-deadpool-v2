@@ -22,12 +22,13 @@ public sealed class RestoreScriptBuilderService : IRestoreScriptBuilderService
         var databaseName = EscapeIdentifier(plan.DatabaseName);
         var commands = new List<string>
         {
-            BuildRestoreDatabaseWithNoRecovery(databaseName, plan.FullBackup.BackupFilePath)
+            "USE master;",
+            BuildRestoreDatabaseWithNoRecovery(databaseName, plan.FullBackup.BackupFilePath, plan.AllowOverwrite)
         };
 
         if (plan.DifferentialBackup != null)
         {
-            commands.Add(BuildRestoreDatabaseWithNoRecovery(databaseName, plan.DifferentialBackup.BackupFilePath));
+            commands.Add(BuildRestoreDatabaseWithNoRecovery(databaseName, plan.DifferentialBackup.BackupFilePath, false));
         }
 
         if (plan.LogBackups.Any())
@@ -48,9 +49,14 @@ public sealed class RestoreScriptBuilderService : IRestoreScriptBuilderService
         return new RestoreScript(commands);
     }
 
-    private static string BuildRestoreDatabaseWithNoRecovery(string escapedDatabaseName, string path)
+    private static string BuildRestoreDatabaseWithNoRecovery(string escapedDatabaseName, string path, bool allowOverwrite)
     {
-        return $"RESTORE DATABASE [{escapedDatabaseName}] FROM DISK = '{EscapeStringLiteral(path)}' WITH NORECOVERY;";
+        var command = $"RESTORE DATABASE [{escapedDatabaseName}] FROM DISK = '{EscapeStringLiteral(path)}' WITH NORECOVERY";
+        if (allowOverwrite)
+        {
+            command += ", REPLACE";
+        }
+        return command + ";";
     }
 
     private static string BuildRestoreLogWithNoRecovery(string escapedDatabaseName, string path)

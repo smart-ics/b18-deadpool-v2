@@ -21,6 +21,8 @@ public sealed class RestorePlan
 
     public string DatabaseName { get; }
 
+    public bool AllowOverwrite { get; }
+
     /// <summary>
     /// Ordered restore sequence: Full -> [Diff] -> [Logs...]
     /// </summary>
@@ -33,6 +35,7 @@ public sealed class RestorePlan
         BackupJob? differentialBackup,
         IReadOnlyList<BackupJob> logBackups,
         DateTime? actualRestorePoint,
+        bool allowOverwrite,
         bool isValid,
         string? failureReason)
     {
@@ -42,6 +45,7 @@ public sealed class RestorePlan
         DifferentialBackup = differentialBackup;
         LogBackups = logBackups;
         ActualRestorePoint = actualRestorePoint;
+        AllowOverwrite = allowOverwrite;
         IsValid = isValid;
         FailureReason = failureReason;
 
@@ -72,7 +76,8 @@ public sealed class RestorePlan
         BackupJob fullBackup,
         BackupJob? differentialBackup,
         IReadOnlyList<BackupJob> logBackups,
-        DateTime actualRestorePoint)
+        DateTime actualRestorePoint,
+        bool allowOverwrite = false)
     {
         if (fullBackup == null)
             throw new ArgumentNullException(nameof(fullBackup));
@@ -84,6 +89,7 @@ public sealed class RestorePlan
             differentialBackup,
             logBackups ?? Array.Empty<BackupJob>(),
             actualRestorePoint,
+            allowOverwrite,
             isValid: true,
             failureReason: null);
     }
@@ -91,7 +97,8 @@ public sealed class RestorePlan
     public static RestorePlan CreateInvalidPlan(
         string databaseName,
         DateTime requestedRestorePoint,
-        string failureReason)
+        string failureReason,
+        bool allowOverwrite = false)
     {
         if (string.IsNullOrWhiteSpace(failureReason))
             throw new ArgumentException("Failure reason must be provided for invalid plan.", nameof(failureReason));
@@ -103,6 +110,7 @@ public sealed class RestorePlan
             differentialBackup: null,
             logBackups: Array.Empty<BackupJob>(),
             actualRestorePoint: null,
+            allowOverwrite,
             isValid: false,
             failureReason: failureReason);
     }

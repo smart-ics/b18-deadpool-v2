@@ -18,7 +18,7 @@ public sealed class RestorePlannerService : IRestorePlannerService
         _backupJobRepository = backupJobRepository ?? throw new ArgumentNullException(nameof(backupJobRepository));
     }
 
-    public async Task<RestorePlan> BuildRestorePlanAsync(string databaseName, DateTime targetTime)
+    public async Task<RestorePlan> BuildRestorePlanAsync(string databaseName, DateTime targetTime, bool allowOverwrite = false)
     {
         if (string.IsNullOrWhiteSpace(databaseName))
             throw new ArgumentException("Database name cannot be empty.", nameof(databaseName));
@@ -35,7 +35,8 @@ public sealed class RestorePlannerService : IRestorePlannerService
             return RestorePlan.CreateInvalidPlan(
                 databaseName,
                 targetTime,
-                "No valid Full backup found before target time.");
+                "No valid Full backup found before target time.",
+                allowOverwrite);
         }
 
         var differentialBackup = SelectDifferentialBackup(completedBackups, fullBackup, targetTime);
@@ -53,7 +54,8 @@ public sealed class RestorePlannerService : IRestorePlannerService
             fullBackup,
             differentialBackup,
             logSelection.LogBackups,
-            logSelection.ActualRestorePoint);
+            logSelection.ActualRestorePoint,
+            allowOverwrite);
     }
 
     private static BackupJob? SelectFullBackup(List<BackupJob> completedBackups, DateTime targetTime)

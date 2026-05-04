@@ -10,5 +10,5 @@ public interface IRestorePlannerService
     /// <summary>
     /// Builds the restore plan for a target point in time.
     /// </summary>
-    Task<RestorePlan> BuildRestorePlanAsync(string databaseName, DateTime targetTime);
+    Task<RestorePlan> BuildRestorePlanAsync(string databaseName, DateTime targetTime, bool allowOverwrite = false);
 }
