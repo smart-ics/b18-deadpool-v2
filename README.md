@@ -4,7 +4,7 @@
 
 [![.NET 8.0](https://img.shields.io/badge/.NET-8.0-512BD4)](https://dotnet.microsoft.com/)
 [![License](https://img.shields.io/badge/license-Proprietary-red)](LICENSE)
-[![Status](https://img.shields.io/badge/status-Phase%201%20Development-yellow)](docs/TASKS.md)
+[![Status](https://img.shields.io/badge/status-Phase%202%20Development-yellow)](docs/TASKS.md)
 
 ## 🎯 Overview
 
