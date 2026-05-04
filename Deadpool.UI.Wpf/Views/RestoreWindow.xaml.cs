@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Collections.Specialized;
 using System.Windows;
 using System.Windows.Data;
 using System.Windows.Media;
@@ -10,12 +11,16 @@ namespace Deadpool.UI.Wpf.Views;
 public partial class RestoreWindow : Window
 {
     private readonly ILogger<RestoreWindow> _logger;
+    private readonly RestoreViewModel _viewModel;
 
     public RestoreWindow(RestoreViewModel viewModel, ILogger<RestoreWindow> logger)
     {
         InitializeComponent();
+        _viewModel = viewModel;
         DataContext = viewModel;
         _logger = logger;
+        _viewModel.ExecutionLogs.CollectionChanged += OnExecutionLogsCollectionChanged;
+        Closed += OnWindowClosed;
     }
 
     private void OnExecuteRestoreClick(object sender, RoutedEventArgs e)
@@ -27,6 +32,23 @@ public partial class RestoreWindow : Window
     {
         DialogResult = false;
         Close();
+    }
+
+    private void OnExecutionLogsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (e.Action != NotifyCollectionChangedAction.Add || e.NewItems == null || e.NewItems.Count == 0)
+            return;
+
+        if (e.NewItems[e.NewItems.Count - 1] is not string newest)
+            return;
+
+        Dispatcher.InvokeAsync(() => ExecutionLogsList.ScrollIntoView(newest));
+    }
+
+    private void OnWindowClosed(object? sender, EventArgs e)
+    {
+        _viewModel.ExecutionLogs.CollectionChanged -= OnExecutionLogsCollectionChanged;
+        Closed -= OnWindowClosed;
     }
 }
 

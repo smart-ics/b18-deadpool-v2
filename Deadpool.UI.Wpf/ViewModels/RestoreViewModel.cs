@@ -69,6 +69,7 @@ public sealed class RestoreViewModel : INotifyPropertyChanged
         _requireTextMatch = options.Value.RequireTextMatch;
 
         RestorePoints = new ObservableCollection<RestorePointViewModel>();
+        ExecutionLogs = new ObservableCollection<string>();
         RefreshRestorePointsCommand = new AsyncCommand(LoadRestorePointsAsync);
         ExecuteRestoreCommand = new AsyncCommand(ExecuteRestoreAsync, CanExecuteRestore);
 
@@ -78,6 +79,7 @@ public sealed class RestoreViewModel : INotifyPropertyChanged
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public ObservableCollection<RestorePointViewModel> RestorePoints { get; }
+    public ObservableCollection<string> ExecutionLogs { get; }
 
     public RestorePointViewModel? SelectedRestorePoint
     {
@@ -365,6 +367,8 @@ public sealed class RestoreViewModel : INotifyPropertyChanged
 
     private async Task ExecuteRestoreAsync()
     {
+        ExecutionLogs.Clear();
+
         _logger.LogInformation(
             "Restore execute command invoked. Database={Database}, IsValid={IsValid}, Confirmed={Confirmed}, RequireTextMatch={RequireTextMatch}, SelectedPoint={SelectedPoint}",
             DatabaseName,
@@ -376,6 +380,8 @@ public sealed class RestoreViewModel : INotifyPropertyChanged
         var executionBlockReason = GetExecutionBlockReason();
         if (executionBlockReason != null)
         {
+            ExecutionLogs.Add("[Step 1/1] Executing: Pre-flight validation");
+            ExecutionLogs.Add($"❌ Failed: {executionBlockReason}");
             _logger.LogWarning(
                 "Restore execution blocked for {Database}. Reason: {Reason}",
                 DatabaseName,
@@ -386,6 +392,7 @@ public sealed class RestoreViewModel : INotifyPropertyChanged
 
         try
         {
+            ExecutionLogs.Add("[Step 1/4] Executing: Safety confirmation checks");
             var context = new RestoreConfirmationContext
             {
                 DatabaseName = DatabaseName,
@@ -398,7 +405,9 @@ public sealed class RestoreViewModel : INotifyPropertyChanged
                 "Restore command passed local checks. Calling safety guard for {Database}.",
                 DatabaseName);
             _safetyGuard.EnsureConfirmed(context);
+            ExecutionLogs.Add("✔ Success");
 
+            ExecutionLogs.Add($"[Step 2/4] Executing: Restore orchestration to {SelectedRestorePoint!.Time:yyyy-MM-dd HH:mm:ss}");
             ValidationMessage = "Executing restore...";
             _logger.LogInformation(
                 "Calling orchestrator for {Database} at target {TargetTime:o}.",
@@ -408,16 +417,30 @@ public sealed class RestoreViewModel : INotifyPropertyChanged
             _logger.LogInformation(
                 "Orchestrator execution completed successfully for {Database}.",
                 DatabaseName);
+            ExecutionLogs.Add("✔ Success");
+
+            ExecutionLogs.Add("[Step 3/4] Executing: Refresh restore points");
+            await LoadRestorePointsAsync();
+            ExecutionLogs.Add("✔ Success");
+
+            ExecutionLogs.Add("[Step 4/4] Executing: Finalizing restore state");
             ValidationMessage = "Restore execution completed successfully.";
+            ExecutionLogs.Add("✔ Success");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Restore execution failed for {DatabaseName}.", DatabaseName);
+            ExecutionLogs.Add($"❌ Failed: {ex.Message}");
             ValidationMessage = "Restore execution failed: " + ex.Message;
         }
         finally
         {
-            await LoadRestorePointsAsync();
+            if (ExecutionLogs.Count == 0 || !ExecutionLogs[^1].StartsWith("✔ Success", StringComparison.Ordinal))
+            {
+                ExecutionLogs.Add("[Step 3/4] Executing: Refresh restore points");
+                await LoadRestorePointsAsync();
+                ExecutionLogs.Add("✔ Success");
+            }
             RaiseCommandStates();
         }
     }

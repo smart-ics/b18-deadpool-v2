@@ -25,6 +25,7 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
+            <RowDefinition Height="170" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
@@ -229,6 +230,30 @@
 
         <Border Grid.Row="3" Style="{StaticResource CardBorderStyle}" Margin="0,0,0,10">
             <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0"
+                           Style="{StaticResource PanelHeadingTextStyle}"
+                           Text="Execution Logs" />
+
+                <ListBox x:Name="ExecutionLogsList"
+                         Grid.Row="1"
+                         Margin="0,8,0,0"
+                         ItemsSource="{Binding ExecutionLogs}"
+                         BorderThickness="1"
+                         BorderBrush="#2B3B4A"
+                         Background="#13212C"
+                         Foreground="{StaticResource TextBrush}"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                         MinHeight="110" />
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="4" Style="{StaticResource CardBorderStyle}" Margin="0,0,0,10">
+            <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="120" />
                     <ColumnDefinition Width="*" />
@@ -252,7 +277,7 @@
             </Grid>
         </Border>
 
-        <Border Grid.Row="4" Style="{StaticResource CardBorderStyle}">
+        <Border Grid.Row="5" Style="{StaticResource CardBorderStyle}">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
