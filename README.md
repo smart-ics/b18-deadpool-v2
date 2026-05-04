@@ -37,34 +37,34 @@ Deadpool follows **DDD-Lite Clean Architecture** principles for maintainability 
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                     Presentation Layer                   │
+│                     Presentation Layer                  │
 │  ┌─────────────────┐              ┌─────────────────┐   │
 │  │  Deadpool.UI    │              │  Deadpool.Agent │   │
-│  │   (WinForms)    │              │ (Worker Service)│   │
+│  │   (WPF     )    │              │ (Worker Service)│   │
 │  └────────┬────────┘              └────────┬────────┘   │
 └───────────┼─────────────────────────────────┼───────────┘
             │                                 │
 ┌───────────┴─────────────────────────────────┴───────────┐
-│                   Application Layer                      │
+│                   Application Layer                     │
 │  ┌──────────────────────────────────────────────────┐   │
-│  │            Deadpool.Core                          │   │
-│  │  • Domain Entities (SqlServerInstance, Database,  │   │
-│  │    BackupJob, BackupSchedule)                     │   │
-│  │  • Repository Interfaces                          │   │
-│  │  • Service Interfaces                             │   │
+│  │            Deadpool.Core                         │   │
+│  │  • Domain Entities (SqlServerInstance, Database, │   │
+│  │    BackupJob, BackupSchedule)                    │   │
+│  │  • Repository Interfaces                         │   │
+│  │  • Service Interfaces                            │   │
 │  └──────────────────────────────────────────────────┘   │
-└──────────────────────────┬───────────────────────────────┘
+└──────────────────────────┬──────────────────────────────┘
                            │
 ┌──────────────────────────┴───────────────────────────────┐
-│                  Infrastructure Layer                     │
-│  ┌──────────────────────────────────────────────────┐   │
+│                  Infrastructure Layer                    │
+│  ┌───────────────────────────────────────────────────┐   │
 │  │        Deadpool.Infrastructure                    │   │
 │  │  • Dapper Repositories (SqlServerInstanceRepo,    │   │
 │  │    DatabaseRepo, BackupJobRepo, etc.)             │   │
 │  │  • SQL Server Services (BackupExecution,          │   │
 │  │    Monitoring, Scheduler)                         │   │
-│  └──────────────────────────────────────────────────┘   │
-└───────────────────────────────────────────────────────────┘
+│  └───────────────────────────────────────────────────┘   │
+└──────────────────────────────────────────────────────────┘
 ```
 
 **Technology Stack:**
