@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Windows;
 using System.Windows.Media;
 
 namespace Deadpool.UI.Wpf.ViewModels;
@@ -12,11 +13,13 @@ namespace Deadpool.UI.Wpf.ViewModels;
 public sealed class DashboardViewModel : INotifyPropertyChanged
 {
     private readonly IDashboardMonitoringService? _dashboardService;
+    private readonly IBackupProgressService? _backupProgressService;
     private readonly IAgentHeartbeatRepository? _heartbeatRepository;
     private readonly ILogger<DashboardViewModel>? _logger;
     private readonly string _databaseName;
     private readonly string _backupVolumePath;
     private readonly SemaphoreSlim _refreshLock = new(1, 1);
+    private readonly SemaphoreSlim _progressLock = new(1, 1);
 
     private string _headerPrimaryText = "CRITICAL - STORAGE FAILURE IMMINENT";
     private string _headerSecondaryText = "Last update: --:--";
@@ -40,6 +43,13 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
     private string _agentStatus = "Offline";
     private string _lastSeen = "--";
     private string _agentStatusDisplay = "❌ Agent Offline (last seen --)";
+    private bool _isBackupRunning;
+    private string _runningBackupType = "FULL";
+    private double _progressPercent;
+    private string _progressText = "No active backup";
+    private TimeSpan _elapsed = TimeSpan.Zero;
+    private TimeSpan _remaining = TimeSpan.Zero;
+    private Visibility _backupProgressVisibility = Visibility.Collapsed;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -153,17 +163,61 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
         private set => SetField(ref _agentStatusDisplay, value);
     }
 
+    public bool IsBackupRunning
+    {
+        get => _isBackupRunning;
+        private set => SetField(ref _isBackupRunning, value);
+    }
+
+    public string RunningBackupType
+    {
+        get => _runningBackupType;
+        private set => SetField(ref _runningBackupType, value);
+    }
+
+    public double ProgressPercent
+    {
+        get => _progressPercent;
+        private set => SetField(ref _progressPercent, value);
+    }
+
+    public string ProgressText
+    {
+        get => _progressText;
+        private set => SetField(ref _progressText, value);
+    }
+
+    public TimeSpan Elapsed
+    {
+        get => _elapsed;
+        private set => SetField(ref _elapsed, value);
+    }
+
+    public TimeSpan Remaining
+    {
+        get => _remaining;
+        private set => SetField(ref _remaining, value);
+    }
+
+    public Visibility BackupProgressVisibility
+    {
+        get => _backupProgressVisibility;
+        private set => SetField(ref _backupProgressVisibility, value);
+    }
+
     public ObservableCollection<JobRow> RecentJobs { get; } = new();
     public ObservableCollection<AlertItemRow> Alerts { get; } = new();
 
     public DashboardViewModel(
         IDashboardMonitoringService dashboardService,
+        IBackupProgressService backupProgressService,
         IAgentHeartbeatRepository heartbeatRepository,
         ILogger<DashboardViewModel> logger,
         string databaseName,
         string backupVolumePath)
     {
         _dashboardService = dashboardService;
+        _backupProgressService = backupProgressService;
         _heartbeatRepository = heartbeatRepository;
         _logger = logger;
         _databaseName = databaseName;
@@ -184,6 +238,7 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
         }
 
         await RefreshAsync();
+        await RefreshBackupProgressAsync();
         IsLoaded = true;
     }
 
@@ -219,6 +274,49 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
         finally
         {
             _refreshLock.Release();
+        }
+    }
+
+    public async Task RefreshBackupProgressAsync()
+    {
+        if (_backupProgressService == null)
+        {
+            return;
+        }
+
+        if (!await _progressLock.WaitAsync(0))
+        {
+            return;
+        }
+
+        try
+        {
+            var progress = await _backupProgressService.GetRunningBackupAsync();
+            if (progress == null)
+            {
+                SetNoRunningBackupState();
+                return;
+            }
+
+            IsBackupRunning = true;
+            RunningBackupType = progress.BackupType;
+            ProgressPercent = Math.Round(Math.Clamp(progress.PercentComplete, 0d, 100d), 2);
+            Elapsed = TimeSpan.FromSeconds(Math.Max(0, progress.ElapsedSeconds));
+            Remaining = TimeSpan.FromSeconds(Math.Max(0, progress.RemainingSeconds));
+            ProgressText =
+                $"{RunningBackupType} Backup Running - {ProgressPercent:F2}%\n" +
+                $"Elapsed: {FormatDuration(Elapsed)}\n" +
+                $"Remaining: ~{FormatDuration(Remaining)}";
+            BackupProgressVisibility = Visibility.Visible;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Failed to load running backup progress.");
+            SetNoRunningBackupState();
+        }
+        finally
+        {
+            _progressLock.Release();
         }
     }
 
@@ -309,6 +407,13 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
             DatabaseStatusText = "ONLINE",
             DatabaseDetailText = "Instance: PROD-SQL-01",
             DatabaseStatusBrush = Brushes.LimeGreen,
+            IsBackupRunning = true,
+            RunningBackupType = "FULL",
+            ProgressPercent = 37.45,
+            Elapsed = TimeSpan.FromMinutes(12),
+            Remaining = TimeSpan.FromMinutes(20),
+            ProgressText = "FULL Backup Running - 37.45%\nElapsed: 12 min\nRemaining: ~20 min",
+            BackupProgressVisibility = Visibility.Visible,
             IsLoaded = true
         };
 
@@ -379,6 +484,32 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
     private static decimal BytesToGigabytes(long bytes)
     {
         return bytes / 1024m / 1024m / 1024m;
+    }
+
+    private static string FormatDuration(TimeSpan value)
+    {
+        if (value.TotalHours >= 1)
+        {
+            return $"{(int)value.TotalHours}h {value.Minutes}m";
+        }
+
+        if (value.TotalMinutes >= 1)
+        {
+            return $"{(int)value.TotalMinutes} min";
+        }
+
+        return $"{Math.Max(0, value.Seconds)} sec";
+    }
+
+    private void SetNoRunningBackupState()
+    {
+        IsBackupRunning = false;
+        RunningBackupType = "FULL";
+        ProgressPercent = 0;
+        Elapsed = TimeSpan.Zero;
+        Remaining = TimeSpan.Zero;
+        ProgressText = "No backup running";
+        BackupProgressVisibility = Visibility.Collapsed;
     }
 
     private void MapAgentHeartbeat(DateTime? lastSeen)

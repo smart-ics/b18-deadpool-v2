@@ -9,6 +9,7 @@ public partial class DashboardView : UserControl
 {
     private DashboardViewModel? _viewModel;
     private readonly DispatcherTimer _refreshTimer;
+    private readonly DispatcherTimer _progressTimer;
 
     public DashboardView()
     {
@@ -18,6 +19,11 @@ public partial class DashboardView : UserControl
             Interval = TimeSpan.FromMinutes(1)
         };
         _refreshTimer.Tick += RefreshTimer_Tick;
+        _progressTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(2)
+        };
+        _progressTimer.Tick += ProgressTimer_Tick;
 
         if (DesignerProperties.GetIsInDesignMode(this))
         {
@@ -45,8 +51,13 @@ public partial class DashboardView : UserControl
         {
             await _viewModel.LoadAsync();
         }
+        else
+        {
+            await _viewModel.RefreshBackupProgressAsync();
+        }
 
         _refreshTimer.Start();
+        _progressTimer.Start();
     }
 
     private async void RefreshTimer_Tick(object? sender, EventArgs e)
@@ -70,5 +81,24 @@ public partial class DashboardView : UserControl
     private void DashboardView_Unloaded(object sender, System.Windows.RoutedEventArgs e)
     {
         _refreshTimer.Stop();
+        _progressTimer.Stop();
+    }
+
+    private async void ProgressTimer_Tick(object? sender, EventArgs e)
+    {
+        if (_viewModel == null)
+        {
+            return;
+        }
+
+        _progressTimer.Stop();
+        try
+        {
+            await _viewModel.RefreshBackupProgressAsync();
+        }
+        finally
+        {
+            _progressTimer.Start();
+        }
     }
 }

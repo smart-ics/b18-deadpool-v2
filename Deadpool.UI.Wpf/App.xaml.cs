@@ -1,6 +1,7 @@
 using Deadpool.Core.Interfaces;
 using Deadpool.Core.Services;
 using Deadpool.Core.Configuration;
+using Deadpool.Infrastructure.BackupExecution;
 using Deadpool.Infrastructure.Persistence;
 using Deadpool.UI.Wpf.Views;
 using Deadpool.UI.Wpf.ViewModels;
@@ -134,6 +135,12 @@ public partial class App : Application
 		});
 
 		services.AddSingleton<IDashboardMonitoringService, DashboardMonitoringService>();
+		services.AddSingleton<IBackupProgressService>(sp =>
+		{
+			var connectionString = configuration.GetConnectionString("ProductionDatabase")
+				?? throw new InvalidOperationException("ConnectionStrings:ProductionDatabase is required.");
+			return new SqlServerBackupProgressService(connectionString);
+		});
 		services.AddScoped<IRestorePlannerService, RestorePlannerService>();
 		services.AddScoped<IRestorePlanValidatorService, RestorePlanValidatorService>();
 		services.AddScoped<IRestoreScriptBuilderService, RestoreScriptBuilderService>();
@@ -159,6 +166,7 @@ public partial class App : Application
 
 			return new DashboardViewModel(
 				sp.GetRequiredService<IDashboardMonitoringService>(),
+				sp.GetRequiredService<IBackupProgressService>(),
 				sp.GetRequiredService<IAgentHeartbeatRepository>(),
 				sp.GetRequiredService<ILogger<DashboardViewModel>>(),
 				databaseName,
