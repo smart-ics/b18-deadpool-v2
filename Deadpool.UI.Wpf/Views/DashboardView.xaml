@@ -61,19 +61,19 @@
                 <TextBlock Grid.Row="0"
                            Margin="0,0,0,6"
                            Style="{StaticResource PanelHeadingTextStyle}"
-                           Text="{Binding ProgressText}" />
+                           Text="{Binding ProgressText, Mode=OneWay}" />
 
                 <ProgressBar Grid.Row="1"
                              Height="12"
                              Minimum="0"
                              Maximum="100"
-                             Value="{Binding ProgressPercent}" />
+                             Value="{Binding ProgressPercent, Mode=OneWay, UpdateSourceTrigger=PropertyChanged}" />
 
                 <TextBlock Grid.Row="2"
                            Margin="0,6,0,0"
                            FontSize="11"
                            Foreground="{StaticResource MutedTextBrush}"
-                           Text="{Binding ProgressPercent, StringFormat=Progress: {0:F2}%}" />
+                           Text="{Binding ProgressPercent, Mode=OneWay, StringFormat=Progress: {0:F2}%}" />
             </Grid>
         </Border>
 
