@@ -2,6 +2,7 @@ using Deadpool.Core.Domain.Enums;
 using Deadpool.Core.Domain.ValueObjects;
 using Deadpool.Core.Interfaces;
 using Microsoft.Extensions.Logging;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
@@ -52,6 +53,11 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
     private Visibility _backupProgressVisibility = Visibility.Collapsed;
 
     public event PropertyChangedEventHandler? PropertyChanged;
+
+    private void OnPropertyChanged(string propertyName)
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
 
     public bool IsLoaded { get; private set; }
 
@@ -166,37 +172,79 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
     public bool IsBackupRunning
     {
         get => _isBackupRunning;
-        private set => SetField(ref _isBackupRunning, value);
+        private set
+        {
+            if (_isBackupRunning != value)
+            {
+                _isBackupRunning = value;
+                OnPropertyChanged(nameof(IsBackupRunning));
+            }
+        }
     }
 
     public string RunningBackupType
     {
         get => _runningBackupType;
-        private set => SetField(ref _runningBackupType, value);
+        private set
+        {
+            if (_runningBackupType != value)
+            {
+                _runningBackupType = value;
+                OnPropertyChanged(nameof(RunningBackupType));
+            }
+        }
     }
 
     public double ProgressPercent
     {
         get => _progressPercent;
-        private set => SetField(ref _progressPercent, value);
+        private set
+        {
+            if (_progressPercent != value)
+            {
+                _progressPercent = value;
+                OnPropertyChanged(nameof(ProgressPercent));
+            }
+        }
     }
 
     public string ProgressText
     {
         get => _progressText;
-        private set => SetField(ref _progressText, value);
+        private set
+        {
+            if (_progressText != value)
+            {
+                _progressText = value;
+                OnPropertyChanged(nameof(ProgressText));
+            }
+        }
     }
 
     public TimeSpan Elapsed
     {
         get => _elapsed;
-        private set => SetField(ref _elapsed, value);
+        private set
+        {
+            if (_elapsed != value)
+            {
+                _elapsed = value;
+                OnPropertyChanged(nameof(Elapsed));
+            }
+        }
     }
 
     public TimeSpan Remaining
     {
         get => _remaining;
-        private set => SetField(ref _remaining, value);
+        private set
+        {
+            if (_remaining != value)
+            {
+                _remaining = value;
+                OnPropertyChanged(nameof(Remaining));
+            }
+        }
     }
 
     public Visibility BackupProgressVisibility
@@ -535,7 +583,7 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
 
     private void SetField<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
     {
-        if (Equals(field, value))
+        if (object.Equals(field, value))
         {
             return;
         }
